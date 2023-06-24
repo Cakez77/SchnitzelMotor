@@ -1,0 +1,13 @@
+*.exe
+project.4coder
+*.ilk
+*.exe
+*.zip
+*.exp
+*.obj
+*.dll
+*.nativecodeanalysis.xml
+*.lib
+build
+.vscode
+.vs
