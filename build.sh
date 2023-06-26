@@ -1,6 +1,14 @@
 #!/bin/bash
+if [[ "$(uname)" == "Linux" ]]; then
+    echo "Running on Linux"
+    libs=-lX11
+    outputFile=schnitzel
+else
+    echo "Not running on Linux"
+    libs=-luser32
+    outputFile=schnitzel.exe
+fi
 
-libs=-luser32
 warnings=-Wno-writable-strings
 
-clang src/main.cpp -oschnitzel.exe $libs $warnings
+clang src/main.cpp -g -o$outputFile $libs $warnings
