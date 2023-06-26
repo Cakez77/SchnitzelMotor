@@ -11,4 +11,11 @@ project.4coder
 build
 .vscode
 .vs
-/schnitzel*
+schnitzel*
+# macOS specific files and directories
+.DS_Store
+*.swp
+*.dSYM/
+*.xcuserstate
+*.xcworkspace
+*.xcodeproj/

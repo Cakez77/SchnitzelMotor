@@ -17,7 +17,7 @@ bool platform_create_window(int width, int height, char* title)
   XSetWindowAttributes swa;
   swa.event_mask = ExposureMask;
 
-  Window window = XCreateWindow(display, root, 0, 0, 800, 600, 0,
+  Window window = XCreateWindow(display, root, 0, 0, width, height, 0,
                                 CopyFromParent, InputOutput, CopyFromParent,
                                 CWEventMask, &swa);
 

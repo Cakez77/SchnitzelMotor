@@ -1,14 +1,29 @@
 #!/bin/bash
-if [[ "$(uname)" == "Linux" ]]; then
+
+outputFile=schnitzel
+src_base="src/"
+projectFiles=("main.cpp")
+
+if [[ "$(uname)" == "Windows" ]]; then
+    echo "Running on Windows"
+    libs=(-luser32)
+    projectFiles+=("windows_platform.cpp")
+elif [[ "$(uname)" == "Linux" ]]; then
     echo "Running on Linux"
-    libs=-lX11
-    outputFile=schnitzel
+    libs=(-lX11)
+    projectFiles+=("linux_platform.cpp")
+elif [[ "$(uname)" == "Darwin" ]]; then
+    echo "Running on Mac"
+    libs=(-framework Cocoa)
+    projectFiles+=("mac_platform.mm")
+    sdkpath=$(xcode-select --print-path)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+    cflags="-isysroot ${sdkpath} -I${sdkpath}/System/Library/Frameworks/Cocoa.framework/Headers"
 else
-    echo "Not running on Linux"
-    libs=-luser32
-    outputFile=schnitzel.exe
+    echo "Unsupported platform"
+    exit 1
 fi
 
-warnings="-Wno-writable-strings -Wno-format-security"
+warnings=-Wno-writable-strings
+sourceFiles=("${projectFiles[@]/#/${src_base}}")
 
-clang src/main.cpp -g -o$outputFile $libs $warnings
+clang $cflags -g -o $outputFile "${sourceFiles[@]}" "${libs[@]}" $warnings
