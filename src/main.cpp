@@ -1,6 +1,7 @@
 #include "defines.h"
 #include "schnitzel_lib.h"
 #include "game.cpp"
+#include <stdio.h>
 
 // #############################################################################
 //                           Platform Globals

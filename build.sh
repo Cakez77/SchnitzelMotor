@@ -23,7 +23,6 @@ else
     exit 1
 fi
 
-warnings=-Wno-writable-strings
-sourceFiles=("${projectFiles[@]/#/${src_base}}")
+warnings="-Wno-writable-strings -Wno-format-security"
 
 clang $cflags -g -o $outputFile "${sourceFiles[@]}" "${libs[@]}" $warnings
