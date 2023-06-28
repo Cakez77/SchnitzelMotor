@@ -1,3 +1,6 @@
+
+#include <stdio.h>
+
 // Aparently works on Windows, Linux and Mac, have not tested on MAC!
 #define TEXT_COLOR_BLACK "\x1b[30m"
 #define TEXT_COLOR_RED "\x1b[31m"
@@ -16,6 +19,12 @@
 #define TEXT_COLOR_BRIGHT_CYAN "\x1b[96m"
 #define TEXT_COLOR_BRIGHT_WHITE "\x1b[97m"
 
+#ifdef _WIN32
+#define DEBUG_BREAK() __debugbreak()
+#elif __linux__
+#define DEBUG_BREAK() __asm__ volatile ("int3")
+#endif
+
 // TRACE: Update Game took %.02f seconds, time
 template <typename... Args>
 void _log(char* text, Args... args)
@@ -25,16 +34,16 @@ void _log(char* text, Args... args)
   puts(buffer);
 }
 
-#define SM_TRACE(msg, ...) _log(TEXT_COLOR_GREEN "TRACE: \033[0m" msg, __VA_ARGS__);
-#define SM_WARN(msg, ...) _log(TEXT_COLOR_YELLOW "WARN: \033[0m" msg, __VA_ARGS__);
-#define SM_ERROR(msg, ...) _log(TEXT_COLOR_RED "ERROR: \033[0m" msg, __VA_ARGS__);
+#define SM_TRACE(msg, ...) _log(TEXT_COLOR_GREEN "TRACE: \033[0m" msg, ##__VA_ARGS__);
+#define SM_WARN(msg, ...) _log(TEXT_COLOR_YELLOW "WARN: \033[0m" msg, ##__VA_ARGS__);
+#define SM_ERROR(msg, ...) _log(TEXT_COLOR_RED "ERROR: \033[0m" msg, ##__VA_ARGS__);
 
 #define SM_ASSERT(x, msg, ...)                                                                    \
 {                                                                                                 \
   if(!(x))                                                                                        \
   {                                                                                               \
     _log(TEXT_COLOR_RED "ASSERTION FAILED: Line: %d, File: %s \033[0m" msg, __LINE__, __FILE__);  \
-    __debugbreak();                                                                               \
+    DEBUG_BREAK();                                                                               \
   }                                                                                               \
 }
 
