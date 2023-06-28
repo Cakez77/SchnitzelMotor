@@ -11,12 +11,20 @@ extern bool running;
 // #############################################################################
 //                           Platform Functions
 // #############################################################################
-#if defined(_WIN32) || defined(__linux__)
 bool platform_create_window(int width, int height, char* title);
 void platform_update_window();
+
+// #############################################################################
+//                           Windows Platform
+// #############################################################################
+#ifdef _WIN32
+#include "win32_platform.cpp"
 #elif defined(__APPLE__)
-  #include "mac_platform.h"
+#include "mac_platform.cpp"
+#else // Linux
+#include "linux_platform.cpp"
 #endif
+
 
 int main()
 {

@@ -2,11 +2,9 @@
 
 static NSWindow* window;
 
-extern "C" {
-    bool running = true; // time to signal exit from main loop
-}
+bool running = true; // time to signal exit from main loop
 
-extern "C" bool platform_create_window(int width, int height, char* title)
+bool platform_create_window_objc(int width, int height, char* title)
 {
     // Start the shared application
     [NSApplication sharedApplication];
@@ -34,7 +32,7 @@ extern "C" bool platform_create_window(int width, int height, char* title)
     return true;
 }
 
-extern "C" void platform_update_window()
+void platform_update_window_objc()
 {
     while (running) {
         NSEvent* event;

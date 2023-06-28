@@ -1,29 +1,22 @@
 #!/bin/bash
 
-outputFile=schnitzel
-src_base="src/"
-projectFiles=("main.cpp")
-
-if [[ "$(uname)" == "Windows" ]]; then
-    echo "Running on Windows"
-    libs=(-luser32)
-    projectFiles+=("windows_platform.cpp")
-elif [[ "$(uname)" == "Linux" ]]; then
+if [[ "$(uname)" == "Linux" ]]; then
     echo "Running on Linux"
-    libs=(-lX11)
-    projectFiles+=("linux_platform.cpp")
+    libs=-lX11
+    outputFile=schnitzel
 elif [[ "$(uname)" == "Darwin" ]]; then
     echo "Running on Mac"
-    libs=(-framework Cocoa)
-    projectFiles+=("mac_platform.mm")
+    libs="-framework Cocoa"
     sdkpath=$(xcode-select --print-path)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
     cflags="-isysroot ${sdkpath} -I${sdkpath}/System/Library/Frameworks/Cocoa.framework/Headers"
+    objc_dep="src/mac_platform.cpp src/mac_platform.m"
+    outputFile=schnitzel
+
 else
-    echo "Unsupported platform"
-    exit 1
+    echo "Not running on Linux"
+    libs=-luser32
+    outputFile=schnitzel.exe
 fi
 
-warnings="-Wno-writable-strings -Wno-format-security"
-sourceFiles=("${projectFiles[@]/#/${src_base}}")
-
-clang $cflags -g -o $outputFile "${sourceFiles[@]}" "${libs[@]}" $warnings
+warnings="-Wno-writable-strings -Wno-format-security -Wno-c++11-extensions -Wno-deprecated-declarations"
+clang $cflags -g "src/main.cpp" $objc_dep -o $outputFile $libs $warnings

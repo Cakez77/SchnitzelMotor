@@ -9,6 +9,7 @@ project.4coder
 *.dll
 *.nativecodeanalysis.xml
 *.lib
+*.o
 build
 .vscode
 .vs
