@@ -9,6 +9,6 @@ else
     outputFile=schnitzel.exe
 fi
 
-warnings=-Wno-writable-strings
+warnings="-Wno-writable-strings -Wno-format-security"
 
 clang src/main.cpp -g -o$outputFile $libs $warnings

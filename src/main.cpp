@@ -1,4 +1,6 @@
 #include "defines.h"
+#include "schnitzel_lib.h"
+#include "game.cpp"
 #include <stdio.h>
 
 // #############################################################################
@@ -26,12 +28,13 @@ void platform_update_window();
 int main()
 {
   platform_create_window(1200, 720, "Schnitzel Motor");
-  
+
   while(running)
   {
     platform_update_window();
+    update_game();
   }
-  
+
   return 0;
 }
 
