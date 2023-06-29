@@ -1,6 +1,6 @@
 
 #include <X11/Xlib.h>
-
+extern bool running;  // <- declare, but do not define
 static Display* display;
 static Atom wmDeleteWindow;
 bool platform_create_window(int width, int height, char* title)
@@ -17,7 +17,7 @@ bool platform_create_window(int width, int height, char* title)
   XSetWindowAttributes swa;
   swa.event_mask = ExposureMask;
 
-  Window window = XCreateWindow(display, root, 0, 0, 800, 600, 0,
+  Window window = XCreateWindow(display, root, 0, 0, width, height, 0,
                                 CopyFromParent, InputOutput, CopyFromParent,
                                 CWEventMask, &swa);
 

@@ -1,12 +1,12 @@
 #include "defines.h"
 #include "schnitzel_lib.h"
 #include "game.cpp"
+#include <stdio.h>
 
 // #############################################################################
 //                           Platform Globals
 // #############################################################################
-static bool running = true;
-
+ bool running = true; 
 
 // #############################################################################
 //                           Platform Functions
@@ -14,15 +14,17 @@ static bool running = true;
 bool platform_create_window(int width, int height, char* title);
 void platform_update_window();
 
-
 // #############################################################################
 //                           Windows Platform
 // #############################################################################
 #ifdef _WIN32
 #include "win32_platform.cpp"
+#elif defined(__APPLE__)
+#include "mac_platform.cpp"
 #else // Linux
 #include "linux_platform.cpp"
 #endif
+
 
 int main()
 {
@@ -36,21 +38,3 @@ int main()
 
   return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

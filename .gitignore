@@ -5,10 +5,19 @@ project.4coder
 *.zip
 *.exp
 *.obj
+*.o
 *.dll
 *.nativecodeanalysis.xml
 *.lib
+*.o
 build
 .vscode
 .vs
 /schnitzel*
+# macOS specific files and directories
+.DS_Store
+*.swp
+*.dSYM/
+*.xcuserstate
+*.xcworkspace
+*.xcodeproj/

@@ -23,6 +23,8 @@
 #define DEBUG_BREAK() __debugbreak()
 #elif __linux__
 #define DEBUG_BREAK() __asm__ volatile ("int3")
+#elif __APPLE__
+#define DEBUG_BREAK() __builtin_trap()
 #endif
 
 // TRACE: Update Game took %.02f seconds, time
