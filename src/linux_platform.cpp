@@ -1,6 +1,6 @@
 
 #include <X11/Xlib.h>
-
+extern bool running;  // <- declare, but do not define
 static Display* display;
 static Atom wmDeleteWindow;
 bool platform_create_window(int width, int height, char* title)

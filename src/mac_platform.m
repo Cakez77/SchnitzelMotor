@@ -2,7 +2,7 @@
 
 static NSWindow* window;
 
-bool running = true; // time to signal exit from main loop
+extern bool running;  // <- declare, but do not define
 
 bool platform_create_window_objc(int width, int height, char* title)
 {
@@ -34,25 +34,23 @@ bool platform_create_window_objc(int width, int height, char* title)
 
 void platform_update_window_objc()
 {
-    while (running) {
-        NSEvent* event;
-        while ((event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:nil inMode:NSDefaultRunLoopMode dequeue:YES]) && running) {
-            // Handle other events like window resizing, closing, etc.
-            [NSApp sendEvent:event];
-            
-            // Check for keyboard events and handle Cmd-X shortcut
-            if ([event type] == NSEventTypeKeyDown) {
-                NSString *characters = [event charactersIgnoringModifiers];
-                NSEventModifierFlags flags = [event modifierFlags];
-                
-                if (flags & NSEventModifierFlagCommand && [characters isEqualToString:@"x"]) {
-                    running = false; // Exit the application
-                    break; // Stop processing events
-                }
+    NSEvent* event;
+    while ((event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate date] inMode:NSDefaultRunLoopMode dequeue:YES]) && running) {
+        // Handle other events like window resizing, closing, etc.
+        [NSApp sendEvent:event];
+
+        // Check for keyboard events
+        if ([event type] == NSEventTypeKeyDown) {
+            NSString *characters = [event charactersIgnoringModifiers];
+            NSEventModifierFlags flags = [event modifierFlags];
+
+            // Handle window close shortcut 'cmd + q'
+            if (flags & NSEventModifierFlagCommand && [characters isEqualToString:@"q"]) {
+                running = false; // Exit the application
+                break; // Stop processing events
             }
         }
-        
-        [NSApp updateWindows];
-        if (!running) break;
     }
+
+    [NSApp updateWindows];
 }

@@ -9,9 +9,10 @@ elif [[ "$(uname)" == "Darwin" ]]; then
     libs="-framework Cocoa"
     sdkpath=$(xcode-select --print-path)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
     cflags="-isysroot ${sdkpath} -I${sdkpath}/System/Library/Frameworks/Cocoa.framework/Headers"
-    objc_dep="src/mac_platform.cpp src/mac_platform.m"
+    objc_dep="src/mac_platform.m"
     outputFile=schnitzel
-
+    # clean up old object files
+    rm -f src/*.o
 else
     echo "Not running on Linux"
     libs=-luser32
