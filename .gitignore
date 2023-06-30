@@ -1,5 +1,6 @@
 *.exe
 project.4coder
+tags
 *.ilk
 *.exe
 *.zip
