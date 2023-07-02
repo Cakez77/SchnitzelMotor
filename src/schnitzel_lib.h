@@ -1,6 +1,14 @@
 
 #include <stdio.h>
+#include <memory>
 
+// #############################################################################
+//                           Defines
+// #############################################################################
+
+// #############################################################################
+//                           Logging
+// #############################################################################
 // Aparently works on Windows, Linux and Mac, have not tested on MAC!
 #define TEXT_COLOR_BLACK "\x1b[30m"
 #define TEXT_COLOR_RED "\x1b[31m"
@@ -40,13 +48,44 @@ void _log(char* text, Args... args)
 #define SM_WARN(msg, ...) _log(TEXT_COLOR_YELLOW "WARN: \033[0m" msg, ##__VA_ARGS__);
 #define SM_ERROR(msg, ...) _log(TEXT_COLOR_RED "ERROR: \033[0m" msg, ##__VA_ARGS__);
 
-#define SM_ASSERT(x, msg, ...)                                                                    \
-{                                                                                                 \
-  if(!(x))                                                                                        \
-  {                                                                                               \
-    _log(TEXT_COLOR_RED "ASSERTION FAILED: Line: %d, File: %s \033[0m" msg, __LINE__, __FILE__);  \
-    DEBUG_BREAK();                                                                               \
-  }                                                                                               \
+#define SM_ASSERT(x, msg, ...)                                                                                   \
+{                                                                                                                \
+  if(!(x))                                                                                                       \
+  {                                                                                                              \
+    _log(TEXT_COLOR_RED "ASSERTION FAILED: Line: %d, File: %s \033[0m" msg, __LINE__, __FILE__, ##__VA_ARGS__);  \
+    DEBUG_BREAK();                                                                                               \
+  }                                                                                                              \
+}
+
+// #############################################################################
+//                           File I/O
+// #############################################################################
+char* read_file(char* filePath, int* fileSize)
+{
+  SM_ASSERT(filePath, "No filePath supplied!");
+  SM_ASSERT(fileSize, "No fileSize supplied!");
+
+  *fileSize = 0;
+  auto file = fopen(filePath, "r");
+  if(!file)
+  {
+    SM_ERROR("Failed opening File: %s", filePath);
+    return null;
+  }
+
+  fseek(file, 0, SEEK_END);
+  *fileSize = ftell(file);
+  fseek(file, 0, SEEK_SET);
+
+  // TODO: Later we use our own memory allocator
+  char* fileBuffer = (char*)malloc(*fileSize + 1);
+  fileBuffer[*fileSize] = 0; // Termina the String
+
+  fread(fileBuffer, sizeof(char), *fileSize, file);
+
+  fclose(file);
+
+  return fileBuffer;
 }
 
 
