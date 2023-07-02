@@ -1,3 +1,2 @@
-
-#define null 0
+#define null nullptr 
 
