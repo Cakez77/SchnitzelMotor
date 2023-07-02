@@ -3,6 +3,7 @@
 if [[ "$(uname)" == "Linux" ]]; then
     echo "Running on Linux"
     libs=-lX11
+    includes="-Ithird_party"
     outputFile=schnitzel
 elif [[ "$(uname)" == "Darwin" ]]; then
     echo "Running on Mac"
@@ -15,9 +16,12 @@ elif [[ "$(uname)" == "Darwin" ]]; then
     rm -f src/*.o
 else
     echo "Not running on Linux"
-    libs=-luser32
+    libs="-luser32 -lgdi32 -lopengl32"
+    includes="-Ithird_party"
     outputFile=schnitzel.exe
 fi
 
 warnings="-Wno-writable-strings -Wno-format-security -Wno-c++11-extensions -Wno-deprecated-declarations"
-clang $cflags -g "src/main.cpp" $objc_dep -o $outputFile $libs $warnings
+clang $includes $cflags -g "src/main.cpp" $objc_dep -o $outputFile $libs $warnings
+
+
