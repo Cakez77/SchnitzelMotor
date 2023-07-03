@@ -2,7 +2,7 @@
 
 if [[ "$(uname)" == "Linux" ]]; then
     echo "Running on Linux"
-    libs=-lX11
+    libs="-lX11 -lGL"
     includes="-Ithird_party"
     outputFile=schnitzel
 elif [[ "$(uname)" == "Darwin" ]]; then

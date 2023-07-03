@@ -55,7 +55,6 @@ static PFNGLDELETEBUFFERSPROC glDeleteBuffers_ptr;
 static PFNGLDELETEPROGRAMPROC glDeleteProgram_ptr;
 static PFNGLDETACHSHADERPROC glDetachShader_ptr;
 static PFNGLDELETESHADERPROC glDeleteShader_ptr;
-static PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT_ptr;
 static PFNGLDRAWELEMENTSINSTANCEDPROC glDrawElementsInstanced_ptr;
 static PFNGLGENERATEMIPMAPPROC glGenerateMipmap_ptr;
 
@@ -113,7 +112,6 @@ void load_gl_functions()
   glDeleteProgram_ptr = (PFNGLDELETEPROGRAMPROC) platform_load_gl_func("glDeleteProgram");
   glDetachShader_ptr = (PFNGLDETACHSHADERPROC) platform_load_gl_func("glDetachShader");
   glDeleteShader_ptr = (PFNGLDELETESHADERPROC) platform_load_gl_func("glDeleteShader");
-  wglSwapIntervalEXT_ptr = (PFNWGLSWAPINTERVALEXTPROC) platform_load_gl_func("wglSwapIntervalEXT");
   glDrawElementsInstanced_ptr = (PFNGLDRAWELEMENTSINSTANCEDPROC) platform_load_gl_func("glDrawElementsInstanced");
   glGenerateMipmap_ptr = (PFNGLGENERATEMIPMAPPROC) platform_load_gl_func("glGenerateMipmap");
 }
@@ -369,11 +367,6 @@ void glDetachShader (GLuint program, GLuint shader)
 void glDeleteShader(GLuint shader)
 {
     glDeleteShader_ptr(shader);
-}
-
-void wglSwapIntervalEXT(GLint interval)
-{
-    wglSwapIntervalEXT_ptr(interval);
 }
 
 void glDrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, const void* indices, GLsizei instancecount)

@@ -7,9 +7,25 @@ struct GLContext
 
 static GLContext glContext;
 
+static void APIENTRY gl_debug_callback(GLenum source, GLenum type,
+                                       GLuint id, GLenum severity,
+                                       GLsizei length,
+                                       const GLchar* message,
+                                       const void* user)
+{
+  if(severity == GL_DEBUG_SEVERITY_HIGH ||
+     severity == GL_DEBUG_SEVERITY_MEDIUM)
+  {
+    SM_ASSERT(0, "OpenGL Error: %s", message);
+  }
+}
+
 bool gl_init()
 {
   load_gl_functions();
+
+  glDebugMessageCallback(&gl_debug_callback, 0);
+  glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 
   int vertShaderID = glCreateShader(GL_VERTEX_SHADER);
   int fragShaderID = glCreateShader(GL_FRAGMENT_SHADER);
