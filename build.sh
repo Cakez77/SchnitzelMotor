@@ -3,7 +3,7 @@
 if [[ "$(uname)" == "Linux" ]]; then
     echo "Running on Linux"
     libs="-lX11 -lGL"
-    includes="-Ithird_party"
+    includes="-Ithird_party -I/usr/X11R6/include"
     outputFile=schnitzel
 elif [[ "$(uname)" == "Darwin" ]]; then
     echo "Running on Mac"

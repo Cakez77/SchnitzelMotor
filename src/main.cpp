@@ -13,7 +13,7 @@
 //                           Platform Globals
 // #############################################################################
 bool running = true;
-static KeyCode KeyCodeLookupTable[KEY_COUNT];
+static KeyCodes KeyCodeLookupTable[65536];
 
 // #############################################################################
 //                           Platform Functions
