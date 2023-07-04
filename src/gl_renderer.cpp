@@ -7,19 +7,6 @@ struct GLContext
 
 static GLContext glContext;
 
-static void APIENTRY gl_debug_callback(GLenum source, GLenum type,
-                                       GLuint id, GLenum severity,
-                                       GLsizei length,
-                                       const GLchar* message,
-                                       const void* user)
-{
-  if(severity == GL_DEBUG_SEVERITY_HIGH ||
-     severity == GL_DEBUG_SEVERITY_MEDIUM)
-  {
-    SM_ASSERT(0, "OpenGL Error: %s", message);
-  }
-}
-
 static void APIENTRY gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum severity,
                                          GLsizei length, const GLchar* message, const void* user)
 {
