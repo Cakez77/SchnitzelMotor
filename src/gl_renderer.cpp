@@ -20,9 +20,22 @@ static void APIENTRY gl_debug_callback(GLenum source, GLenum type,
   }
 }
 
+static void APIENTRY gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum severity,
+                                         GLsizei length, const GLchar* message, const void* user)
+{
+  if(severity == GL_DEBUG_SEVERITY_MEDIUM ||
+     severity == GL_DEBUG_SEVERITY_HIGH)
+  {
+    SM_ASSERT(0, "OpenGL Error: %s", message);
+  }
+}
+
 bool gl_init()
 {
   load_gl_functions();
+
+  glDebugMessageCallback(&gl_debug_callback, 0);
+  glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 
   glDebugMessageCallback(&gl_debug_callback, 0);
   glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
@@ -57,6 +70,8 @@ bool gl_init()
 
   // This is preemtively, because they are still bound
   // They are already marked for deletion tho
+  glDetachShader(glContext.programID, vertShaderID);
+  glDetachShader(glContext.programID, fragShaderID);
   glDeleteShader(vertShaderID);
   glDeleteShader(fragShaderID);
 

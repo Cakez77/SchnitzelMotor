@@ -9,6 +9,7 @@
 // #############################################################################
 static HWND window;
 static HDC dc;
+static PFNGLDEBUGMESSAGECALLBACKPROC glDebugMessageCallback_ptr;
 
 // #############################################################################
 //                           Platform Implementations
@@ -131,6 +132,7 @@ bool platform_create_window(int width, int height, char* title)
 
     wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC)platform_load_gl_func("wglChoosePixelFormatARB");
     wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)platform_load_gl_func("wglCreateContextAttribsARB");
+    glDebugMessageCallback_ptr = (PFNGLDEBUGMESSAGECALLBACKPROC)platform_load_gl_func("glDebugMessageCallback");
 
     // Clean up the fake stuff
     wglMakeCurrent(fakeDC, 0);
@@ -257,4 +259,9 @@ void* platform_load_gl_func(char* funName)
 void platform_swap_buffers()
 {
   SwapBuffers(dc);
+}
+
+void glDebugMessageCallback (GLDEBUGPROC callback, const void *userParam)
+{
+  glDebugMessageCallback_ptr(callback, userParam);
 }
