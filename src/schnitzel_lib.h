@@ -1,10 +1,19 @@
-
+#pragma once
 #include <stdio.h>
 #include <stdlib.h>
 
 // #############################################################################
 //                           Defines
 // #############################################################################
+#define null 0
+#define b8 char
+#define u8 unsigned char
+
+// #############################################################################
+//                           Defines
+// #############################################################################
+// render_interface.h
+constexpr int MAX_TRANSFORMS = 100;
 
 // #############################################################################
 //                           Logging
@@ -56,6 +65,58 @@ void _log(char* text, Args... args)
     DEBUG_BREAK();                                                                                               \
   }                                                                                                              \
 }
+
+// #############################################################################
+//                           Array
+// #############################################################################
+template<typename T, int N>
+struct Array
+{
+  static constexpr int maxElements = N;
+  int count = 0;
+  T elements[N];
+
+  T& operator[](int idx)
+  {
+    SM_ASSERT(idx >= 0, "idx negative!");
+    SM_ASSERT(idx < count, "Idx out of bounds!");
+    return elements[idx];
+  }
+
+  int add(T element)
+  {
+    SM_ASSERT(count < maxElements, "Array Full!");
+    elements[count] = element;
+    return count++;
+  }
+
+  void remove_idx_and_swap(int idx)
+  {
+    SM_ASSERT(idx >= 0, "idx negative!");
+    SM_ASSERT(idx < count, "idx out of bounds!");
+    elements[idx] = elements[--count];
+  }
+
+  void clear()
+  {
+    count = 0;
+  }
+
+  bool is_full()
+  {
+    return count == N;
+  }
+};
+
+
+// #############################################################################
+//                           Math stuff
+// #############################################################################
+struct Vec2
+{
+  float x;
+  float y;
+};
 
 // #############################################################################
 //                           File I/O

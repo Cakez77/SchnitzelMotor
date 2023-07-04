@@ -3,6 +3,8 @@
 struct GLContext
 {
   int programID;
+  int transformSBOID;
+  int screenSizeID;
 };
 
 static GLContext glContext;
@@ -24,9 +26,6 @@ bool gl_init()
   glDebugMessageCallback(&gl_debug_callback, 0);
   glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 
-  glDebugMessageCallback(&gl_debug_callback, 0);
-  glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-
   int vertShaderID = glCreateShader(GL_VERTEX_SHADER);
   int fragShaderID = glCreateShader(GL_FRAGMENT_SHADER);
 
@@ -40,6 +39,17 @@ bool gl_init()
   glShaderSource(vertShaderID, 1, &vertShaderSource, &fileSize);
   glCompileShader(vertShaderID);
 
+  // Validate if the Shader works
+  {
+    int success;
+    char shaderLog[1024] = {};
+    glGetShaderiv(vertShaderID, GL_COMPILE_STATUS, &success);
+    if(!success)
+    {
+      glGetShaderInfoLog(vertShaderID, 1024, 0, shaderLog);
+      SM_ASSERT(0, "Failed to compile shader: %s", shaderLog);
+    }
+  }
 
   char* fragShaderSource = read_file("assets/shaders/quad.frag", &fileSize);
   if(!fragShaderSource)
@@ -70,6 +80,19 @@ bool gl_init()
 
   glUseProgram(glContext.programID);
 
+  // Transform Storage Buffer
+  {
+    glGenBuffers(1, (GLuint*)&glContext.transformSBOID);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, glContext.transformSBOID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Transform) * MAX_TRANSFORMS,
+                 renderData.transforms.elements, GL_STATIC_DRAW);
+  }
+
+  // Screen Size Uniform
+  {
+    glContext.screenSizeID = glGetUniformLocation(glContext.programID, "screenSize");
+  }
+
   return true;
 }
 
@@ -79,8 +102,27 @@ void gl_render()
   glClearColor(0.2f, 0.02f, 0.2f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT);
 
-  glDrawArrays(GL_TRIANGLES, 0, 6);
+  glViewport(0, 0, input.screenSize.x, input.screenSize.y);
+
+  // Copy screenSize to the GPU
+  glUniform2fv(glContext.screenSizeID, 1, &input.screenSize.x);
+
+  // Copy transforms to the GPU
+  glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Transform) * MAX_TRANSFORMS,
+                  renderData.transforms.elements);
+  // Reset for next Frame
+
+  glDrawArraysInstanced(GL_TRIANGLES, 0, 6, renderData.transforms.count);
+  renderData.transforms.clear();
 }
+
+
+
+
+
+
+
+
 
 
 
