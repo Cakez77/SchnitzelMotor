@@ -22,6 +22,6 @@ else
 fi
 
 warnings="-Wno-writable-strings -Wno-format-security -Wno-c++11-extensions -Wno-deprecated-declarations"
-clang $includes $cflags -g "src/main.cpp" $objc_dep -o $outputFile $libs $warnings
+clang++ $includes $cflags -g "src/main.cpp" $objc_dep -o $outputFile $libs $warnings
 
 
