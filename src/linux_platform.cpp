@@ -173,13 +173,11 @@ bool platform_create_window(int width, int height, char* title)
 
   int pixelAttribs[] = 
   {
-    GLX_RGBA_BIT,       True,
+    GLX_RGBA,           True,
     GLX_DOUBLEBUFFER,   True,
     GLX_RED_SIZE,          8,
     GLX_GREEN_SIZE,        8,
     GLX_BLUE_SIZE,         8,
-    GLX_ALPHA_SIZE,        8,
-    GLX_DEPTH_BUFFER_BIT, 24,
     None
   };
 
