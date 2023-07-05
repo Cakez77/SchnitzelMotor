@@ -1,10 +1,13 @@
 #include "gl_renderer.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 struct GLContext
 {
   int programID;
   int transformSBOID;
   int screenSizeID;
+  int textureID;
 };
 
 static GLContext glContext;
@@ -59,6 +62,17 @@ bool gl_init()
   }
   glShaderSource(fragShaderID, 1, &fragShaderSource, &fileSize);
   glCompileShader(fragShaderID);
+  // Validate if the Shader works
+  {
+    int success;
+    char shaderLog[1024] = {};
+    glGetShaderiv(fragShaderID, GL_COMPILE_STATUS, &success);
+    if(!success)
+    {
+      glGetShaderInfoLog(fragShaderID, 1024, 0, shaderLog);
+      SM_ASSERT(0, "Failed to compile shader: %s", shaderLog);
+    }
+  }
 
   glContext.programID = glCreateProgram();
   glAttachShader(glContext.programID, vertShaderID);
@@ -78,8 +92,6 @@ bool gl_init()
   glGenVertexArrays(1, (GLuint*)&VAO);
   glBindVertexArray(VAO);
 
-  glUseProgram(glContext.programID);
-
   // Transform Storage Buffer
   {
     glGenBuffers(1, (GLuint*)&glContext.transformSBOID);
@@ -92,6 +104,46 @@ bool gl_init()
   {
     glContext.screenSizeID = glGetUniformLocation(glContext.programID, "screenSize");
   }
+
+  // Load our first Texture
+  {
+    int width, height, nChannels;
+    char* data = (char*)stbi_load("assets/textures/Texture_Atlas_01.png", 
+                                  &width, &height, &nChannels, 4);
+    int textureSizeInBytes = 4 * width * height;
+
+    if(!data)
+    {
+      SM_ASSERT(0, "Failed to load Texture!");
+      return false;
+    }
+
+    glGenTextures(1, (GLuint*)&glContext.textureID);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, glContext.textureID);
+
+    // set the texture wrapping/filtering options (on the currently bound texture object)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    // This setting only matters when using the GLSL texture() function
+    // When you use texelFetch() this setting has no effect,
+    // because texelFetch is designed for this purpose
+    // See: https://interactiveimmersive.io/blog/glsl/glsl-data-tricks/
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    stbi_image_free(data);
+  }
+
+  glUseProgram(glContext.programID);
+
+  // sRGB output (even if input texture is non-sRGB -> don't rely on texture used)
+  // Your font is not using sRGB, for example (not that it matters there, because no actual color is sampled from it)
+  // But this could prevent some future bug when you start mixing different types of textures
+  // Of course, you still need to correctly set the image file source format when using glTexImage2D()
+  glEnable(GL_FRAMEBUFFER_SRGB);
+  glDisable(0x809D); // disable multisampling
 
   return true;
 }

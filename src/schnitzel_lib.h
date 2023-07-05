@@ -121,6 +121,22 @@ struct Vec2
   float y;
 };
 
+Vec2 operator*(Vec2 a, float scalar)
+{
+  return Vec2{a.x * scalar, a.y * scalar};
+}
+
+struct IVec2
+{
+  int x;
+  int y;
+};
+
+Vec2 vec_2(IVec2 ivec2)
+{
+  return Vec2{(float)ivec2.x, (float)ivec2.y};
+}
+
 // #############################################################################
 //                           File I/O
 // #############################################################################
@@ -130,7 +146,7 @@ char* read_file(char* filePath, int* fileSize)
   SM_ASSERT(fileSize, "No fileSize supplied!");
 
   *fileSize = 0;
-  auto file = fopen(filePath, "r");
+  auto file = fopen(filePath, "rb");
   if(!file)
   {
     SM_ERROR("Failed opening File: %s", filePath);
@@ -142,8 +158,8 @@ char* read_file(char* filePath, int* fileSize)
   fseek(file, 0, SEEK_SET);
 
   // TODO: Later we use our own memory allocator
-  char* fileBuffer = (char*)malloc(*fileSize + 1);
-  fileBuffer[*fileSize] = 0; // Termina the String
+  char* fileBuffer = new char[*fileSize + 1];
+  fileBuffer[*fileSize] = 0; // Terminate the String
 
   fread(fileBuffer, sizeof(char), *fileSize, file);
 

@@ -27,7 +27,8 @@ void update_game()
     gameState.playerPos.y += speed;
   }
 
-  draw_quad(gameState.playerPos, {50.0f, 50.0f});
+  draw_sprite(SPRITE_CELESTE_01, gameState.playerPos);
+  // draw_quad(gameState.playerPos, {50.0f, 50.0f});
 }
 
 

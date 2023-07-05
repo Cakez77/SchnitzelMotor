@@ -45,7 +45,7 @@ LRESULT CALLBACK windows_window_callback(HWND window, UINT msg,
     case WM_SYSKEYUP:
     {
       bool isDown = (msg == WM_KEYDOWN) || (msg == WM_SYSKEYDOWN);
-      KeyCode keyCode = KeyCodeLookupTable[wParam];
+      KeyCodes keyCode = KeyCodeLookupTable[wParam];
 
       Key* key = &input.keys[keyCode];
       key->isDown = isDown;
@@ -215,12 +215,12 @@ bool platform_create_window(int width, int height, char* title)
                             100,         // y - Pos
                             width,       // width
                             height,      // height
-                            null,        // parent
-                            null,        // menu
+                            NULL,     // parent
+                            NULL,        // menu
                             instance,
-                            null);       // lpParam
+                            NULL);       // lpParam
 
-    if(window == null)
+    if(window == NULL)
     {
       SM_ASSERT(0, "Failed to create Windows Window");
       return false;
@@ -292,12 +292,12 @@ bool platform_create_window(int width, int height, char* title)
                             100,         // y - Pos
                             width,       // width
                             height,      // height
-                            null,        // parent
-                            null,        // menu
+                            NULL,        // parent
+                            NULL,        // menu
                             instance,
-                            null);       // lpParam
+                            NULL);       // lpParam
 
-    if(window == null)
+    if(window == NULL)
     {
       SM_ASSERT(0, "Failed to create Windows Window");
       return false;
