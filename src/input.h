@@ -1,6 +1,6 @@
 #include "schnitzel_lib.h"
 
-enum KeyCode
+enum KeyCodes
 {
   KEY_LEFT_MOUSE,
   KEY_MIDDLE_MOUSE,
@@ -86,18 +86,18 @@ struct Input
 
 static Input input;
 
-bool key_is_down(KeyCode key)
+bool key_is_down(KeyCodes key)
 {
   return input.keys[key].isDown;
 }
 
-bool key_pressed_this_frame(KeyCode key)
+bool key_pressed_this_frame(KeyCodes key)
 {
   Key k = input.keys[key];
   return k.halfTransitionCount > 0 && k.isDown || k.halfTransitionCount > 1;
 }
 
-bool key_released_this_frame(KeyCode key)
+bool key_released_this_frame(KeyCodes key)
 {
   Key k = input.keys[key];
   return k.halfTransitionCount > 0 && !k.isDown || k.halfTransitionCount > 1;

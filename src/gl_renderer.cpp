@@ -85,7 +85,7 @@ bool gl_init()
     glGenBuffers(1, (GLuint*)&glContext.transformSBOID);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, glContext.transformSBOID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Transform) * MAX_TRANSFORMS,
-                 renderData.transforms.elements, GL_STATIC_DRAW);
+                 renderData.transforms.elements, GL_DYNAMIC_DRAW);
   }
 
   // Screen Size Uniform

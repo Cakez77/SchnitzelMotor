@@ -13,7 +13,7 @@
 //                           Platform Globals
 // #############################################################################
 bool running = true;
-static KeyCode KeyCodeLookupTable[KEY_COUNT];
+static KeyCodes KeyCodeLookupTable[256];
 
 // #############################################################################
 //                           Platform Functions
@@ -40,15 +40,15 @@ void platform_swap_buffers();
 // #############################################################################
 #include "gl_renderer.cpp"
 
-
 int main()
 {
-  platform_fill_keycode_lookup_table();
   if(!platform_create_window(1200, 720, "Schnitzel Motor"))
   {
     SM_ERROR("Failed to create Windows Window");
     return -1;
   }
+
+  platform_fill_keycode_lookup_table();
 
   if(!gl_init())
   {
@@ -58,6 +58,12 @@ int main()
 
   while(running)
   {
+    // Reset Input
+    for(int keyIdx = 0; keyIdx < 512; keyIdx++)
+    {
+      input.keys[keyIdx].halfTransitionCount = 0;
+    }
+
     platform_update_window();
     update_game();
     gl_render();

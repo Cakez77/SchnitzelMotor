@@ -5,13 +5,21 @@
 // #############################################################################
 //                           Defines
 // #############################################################################
-#define null 0
 #define b8 char
 #define u8 unsigned char
+#define BIT(x) 1 << x
 
 // #############################################################################
 //                           Defines
 // #############################################################################
+#ifdef _WIN32
+#define DEBUG_BREAK() __debugbreak()
+#elif __linux__
+#define DEBUG_BREAK() __asm__ volatile ("int3")
+#elif __APPLE__
+#define DEBUG_BREAK() __builtin_trap()
+#endif
+
 // render_interface.h
 constexpr int MAX_TRANSFORMS = 100;
 
@@ -36,34 +44,29 @@ constexpr int MAX_TRANSFORMS = 100;
 #define TEXT_COLOR_BRIGHT_CYAN "\x1b[96m"
 #define TEXT_COLOR_BRIGHT_WHITE "\x1b[97m"
 
-#ifdef _WIN32
-#define DEBUG_BREAK() __debugbreak()
-#elif __linux__
-#define DEBUG_BREAK() __asm__ volatile ("int3")
-#elif __APPLE__
-#define DEBUG_BREAK() __builtin_trap()
-#endif
-
 // TRACE: Update Game took %.02f seconds, time
 template <typename... Args>
-void _log(char* text, Args... args)
+void _log(char* prefix, char* msg, Args... args)
 {
-  char buffer[8192] = {};
-  sprintf(buffer, text, args...);
+  char formatBuffer[8192] = {};
+  sprintf(formatBuffer, "%s %s \033[0m", prefix, msg);
+
+  static char buffer[8192] = {};
+  sprintf(buffer, formatBuffer, args...);
   puts(buffer);
 }
 
-#define SM_TRACE(msg, ...) _log(TEXT_COLOR_GREEN "TRACE: \033[0m" msg, ##__VA_ARGS__);
-#define SM_WARN(msg, ...) _log(TEXT_COLOR_YELLOW "WARN: \033[0m" msg, ##__VA_ARGS__);
-#define SM_ERROR(msg, ...) _log(TEXT_COLOR_RED "ERROR: \033[0m" msg, ##__VA_ARGS__);
+#define SM_TRACE(msg, ...) _log(TEXT_COLOR_GREEN "TRACE:", msg, ##__VA_ARGS__);
+#define SM_WARN(msg, ...) _log(TEXT_COLOR_YELLOW "WARN:", msg "\033[0m", ##__VA_ARGS__);
+#define SM_ERROR(msg, ...) _log(TEXT_COLOR_RED "ERROR:", msg "\033[0m", ##__VA_ARGS__);
 
-#define SM_ASSERT(x, msg, ...)                                                                                   \
-{                                                                                                                \
-  if(!(x))                                                                                                       \
-  {                                                                                                              \
-    _log(TEXT_COLOR_RED "ASSERTION FAILED: Line: %d, File: %s \033[0m" msg, __LINE__, __FILE__, ##__VA_ARGS__);  \
-    DEBUG_BREAK();                                                                                               \
-  }                                                                                                              \
+#define SM_ASSERT(x, msg, ...)     \
+{                                  \
+  if(!(x))                         \
+  {                                \
+    SM_ERROR(msg, ##__VA_ARGS__);  \
+    DEBUG_BREAK();                 \
+  }                                \
 }
 
 // #############################################################################
@@ -131,7 +134,7 @@ char* read_file(char* filePath, int* fileSize)
   if(!file)
   {
     SM_ERROR("Failed opening File: %s", filePath);
-    return null;
+    return nullptr;
   }
 
   fseek(file, 0, SEEK_END);
