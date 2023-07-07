@@ -173,7 +173,8 @@ bool platform_create_window(int width, int height, char* title)
 
   int pixelAttribs[] = 
   {
-    GLX_RGBA,           True,
+    // GLX_RGBA,           True, // Aparently this doesn't work on all Linux Systems, have to test
+    GLX_RGB,           True,
     GLX_DOUBLEBUFFER,   True,
     GLX_RED_SIZE,          8,
     GLX_GREEN_SIZE,        8,
