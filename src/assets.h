@@ -1,9 +1,11 @@
+#pragma once
 #include "schnitzel_lib.h"
 
 enum SpriteID
 {
   SPRITE_WHITE,
   SPRITE_CELESTE_01,
+  SPRITE_CELESTE_02,
 
   SPRITE_COUNT
 };
@@ -31,6 +33,13 @@ Sprite get_sprite(SpriteID spriteID)
     case SPRITE_CELESTE_01:
     {
       sprite.atlasOffset = {117, 0};
+      sprite.size = {17, 20};
+      break;
+    }
+
+    case SPRITE_CELESTE_02:
+    {
+      sprite.atlasOffset = {32, 0};
       sprite.size = {17, 20};
       break;
     }

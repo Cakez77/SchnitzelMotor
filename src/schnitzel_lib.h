@@ -2,18 +2,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// Used to get the timestamp of a file
+#include <sys/stat.h>
+
 // #############################################################################
 //                           Defines
 // #############################################################################
 #define b8 char
 #define u8 unsigned char
-#define BIT(x) 1 << x
+#define BIT(x) 1 << (x)
+#define KB(x) (x) * 1024
+#define MB(x) (x) * KB(x)
+#define GB(x) (x) * MB(x)
 
 // #############################################################################
 //                           Defines
 // #############################################################################
 #ifdef _WIN32
 #define DEBUG_BREAK() __debugbreak()
+#define EXPORT_FN __declspec(dllexport)
 #elif __linux__
 #define DEBUG_BREAK() __asm__ volatile ("int3")
 #elif __APPLE__
@@ -168,5 +175,9 @@ char* read_file(char* filePath, int* fileSize)
   return fileBuffer;
 }
 
-
-
+long long get_timestamp(char* file)
+{
+    struct stat file_stat = {};
+    stat(file, &file_stat);
+    return file_stat.st_mtime;
+}

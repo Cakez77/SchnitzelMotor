@@ -1,3 +1,4 @@
+#pragma once
 #include "schnitzel_lib.h"
 
 enum KeyCodes
@@ -68,7 +69,7 @@ enum KeyCodes
   KEY_NUMPAD_DOT,
   KEY_NUMPAD_SLASH,
   
-  KEY_COUNT = 255,
+  KEY_COUNT = 256,
 };
 
 struct Key
@@ -84,21 +85,21 @@ struct Input
   Key keys[KEY_COUNT];
 };
 
-static Input input;
+static Input* input;
 
 bool key_is_down(KeyCodes key)
 {
-  return input.keys[key].isDown;
+  return input->keys[key].isDown;
 }
 
 bool key_pressed_this_frame(KeyCodes key)
 {
-  Key k = input.keys[key];
+  Key k = input->keys[key];
   return k.halfTransitionCount > 0 && k.isDown || k.halfTransitionCount > 1;
 }
 
 bool key_released_this_frame(KeyCodes key)
 {
-  Key k = input.keys[key];
+  Key k = input->keys[key];
   return k.halfTransitionCount > 0 && !k.isDown || k.halfTransitionCount > 1;
 }

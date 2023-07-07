@@ -97,7 +97,7 @@ bool gl_init()
     glGenBuffers(1, (GLuint*)&glContext.transformSBOID);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, glContext.transformSBOID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Transform) * MAX_TRANSFORMS,
-                 renderData.transforms.elements, GL_DYNAMIC_DRAW);
+                 renderData->transforms.elements, GL_DYNAMIC_DRAW);
   }
 
   // Screen Size Uniform
@@ -154,18 +154,18 @@ void gl_render()
   glClearColor(0.2f, 0.02f, 0.2f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT);
 
-  glViewport(0, 0, input.screenSize.x, input.screenSize.y);
+  glViewport(0, 0, input->screenSize.x, input->screenSize.y);
 
   // Copy screenSize to the GPU
-  glUniform2fv(glContext.screenSizeID, 1, &input.screenSize.x);
+  glUniform2fv(glContext.screenSizeID, 1, &input->screenSize.x);
 
   // Copy transforms to the GPU
   glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Transform) * MAX_TRANSFORMS,
-                  renderData.transforms.elements);
+                  renderData->transforms.elements);
   // Reset for next Frame
 
-  glDrawArraysInstanced(GL_TRIANGLES, 0, 6, renderData.transforms.count);
-  renderData.transforms.clear();
+  glDrawArraysInstanced(GL_TRIANGLES, 0, 6, renderData->transforms.count);
+  renderData->transforms.clear();
 }
 
 

@@ -33,8 +33,8 @@ LRESULT CALLBACK windows_window_callback(HWND window, UINT msg,
       RECT rect = {0};
       GetClientRect(window, &rect);
 
-      input.screenSize.x = (rect.right - rect.left);
-      input.screenSize.y = (rect.bottom - rect.top);
+      input->screenSize.x = (rect.right - rect.left);
+      input->screenSize.y = (rect.bottom - rect.top);
 
       break;
     }
@@ -47,7 +47,7 @@ LRESULT CALLBACK windows_window_callback(HWND window, UINT msg,
       bool isDown = (msg == WM_KEYDOWN) || (msg == WM_SYSKEYDOWN);
       KeyCodes keyCode = KeyCodeLookupTable[wParam];
 
-      Key* key = &input.keys[keyCode];
+      Key* key = &input->keys[keyCode];
       key->isDown = isDown;
       key->halfTransitionCount++;
 
@@ -403,4 +403,32 @@ void platform_swap_buffers()
 void glDebugMessageCallback (GLDEBUGPROC callback, const void *userParam)
 {
   glDebugMessageCallback_ptr(callback, userParam);
+}
+
+void platform_reaload_dynamic_library()
+{
+  static HMODULE gameDLL;
+  static long long lastTimestampGameDLL;
+
+  long long currentTimestampGameDLL = get_timestamp("game.dll");
+  if(currentTimestampGameDLL > lastTimestampGameDLL)
+  {
+    if(gameDLL)
+    {
+      BOOL freeResult = FreeLibrary(gameDLL);
+      SM_ASSERT(freeResult, "Failed to FreeLibrary game.dll");
+      gameDLL = nullptr;
+      SM_TRACE("Freed game.dll");
+    }
+
+    while(!CopyFile("game.dll", "game_load.dll", false)) { Sleep(10); }
+    SM_TRACE("Copied game.dll");
+
+    gameDLL = LoadLibraryA("game_load.dll");
+    SM_ASSERT(gameDLL, "Failed to load game.dll");
+
+    update_game_ptr = (update_game_type*)GetProcAddress(gameDLL, "update_game");
+    SM_ASSERT(update_game_ptr, "Failed to load update_game function");
+    lastTimestampGameDLL = currentTimestampGameDLL;
+  }
 }
