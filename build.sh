@@ -7,7 +7,7 @@ if [[ "$(uname)" == "Linux" ]]; then
     libs="-lX11 -lGL"
     includes="-Ithird_party"
     outputFile=schnitzel
-    queryProcesses=$(echo pgrep $outputFile)
+    queryProcesses=$(pgrep $outputFile)
 
 elif [[ "$(uname)" == "Darwin" ]]; then
     echo "Running on Mac"
@@ -23,7 +23,7 @@ else
     libs="-luser32 -lgdi32 -lopengl32"
     includes="-Ithird_party"
     outputFile=schnitzel.exe
-    queryProcesses=$(echo "tasklist" grep $outputFile)
+    queryProcesses=$(tasklist | grep $outputFile)
 
     timestamp=$(date +%s)
     rm -f game_* # Remove old game_* files
@@ -31,12 +31,12 @@ else
     mv game_$timestamp.dll game.dll
 fi
 
-processRunning=$($queryProcesses)
+processRunning=$queryProcesses
 
 if [ -z "$processRunning" ]; then
     echo "Engine not running, building main..."
     clang++ $includes $cflags -g "src/main.cpp" $objc_dep -o $outputFile $libs $warnings
 else
-    echo "Engine running"
+    echo "Engine running, not building!"
 fi
 
