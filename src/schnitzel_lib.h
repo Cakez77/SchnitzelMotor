@@ -123,6 +123,23 @@ struct Array
 // #############################################################################
 //                           Math stuff
 // #############################################################################
+float min(float a, float b)
+{
+  return (a < b)? a : b;
+}
+
+float max(float a, float b)
+{
+  return (a > b)? a : b;
+}
+
+float approach(float current, float target, float increase)
+{
+  return current < target? 
+    min(current + increase, target) : 
+    max(current - increase, target);
+}
+
 struct Vec2
 {
   float x;
