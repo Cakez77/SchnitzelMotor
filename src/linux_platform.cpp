@@ -296,7 +296,7 @@ void platform_reaload_dynamic_library()
     if(gameDLL)
     {
       int freeResult = dlclose(gameDLL);
-      SM_ASSERT(freeResult, "Failed to dlclose game.so");
+      SM_ASSERT(!freeResult, "Failed to dlclose game.so");
       gameDLL = nullptr;
       SM_TRACE("Freed game.so");
     }
