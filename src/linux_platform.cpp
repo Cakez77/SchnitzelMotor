@@ -1,6 +1,8 @@
 
 #include <X11/Xlib.h>
 #include <GL/glx.h>
+#include <dlfcn.h>
+#include <unistd.h> // for sleep
 
 // #############################################################################
 //                           Linux Defines
@@ -235,8 +237,8 @@ void platform_update_window()
     {
       case Expose:
       {
-        input.screenSize.x = event.xexpose.width;
-        input.screenSize.y = event.xexpose.height;
+        input->screenSize.x = event.xexpose.width;
+        input->screenSize.y = event.xexpose.height;
 
         break;
       }
@@ -245,8 +247,8 @@ void platform_update_window()
       case KeyRelease:
       {
         KeyCodes keyCode = KeyCodeLookupTable[event.xkey.keycode];
-        input.keys[keyCode].isDown = event.type == KeyPress;
-        input.keys[keyCode].halfTransitionCount++;
+        input->keys[keyCode].isDown = event.type == KeyPress;
+        input->keys[keyCode].halfTransitionCount++;
 
         break;
       }
@@ -283,4 +285,38 @@ void platform_swap_buffers()
   glXSwapBuffers(display, window);
 }
 
+void platform_reaload_dynamic_library()
+{
+  static void* gameDLL;
+  static long long lastTimestampGameDLL;
 
+  long long currentTimestampGameDLL = get_timestamp("game.so");
+  if(currentTimestampGameDLL > lastTimestampGameDLL)
+  {
+    if(gameDLL)
+    {
+      int freeResult = dlclose(gameDLL);
+      SM_ASSERT(freeResult, "Failed to dlclose game.so");
+      gameDLL = nullptr;
+      SM_TRACE("Freed game.so");
+    }
+
+    while(!copy_file("game.so", "game_load.so"))
+    {
+      sleep(10);
+    }
+    SM_TRACE("Copied game.dll");
+
+    gameDLL = dlopen("./game_load.so", RTLD_NOW);
+    char *errstr = dlerror(); 
+    if (errstr != NULL) 
+    {
+      printf ("A dynamic linking error occurred: (%s)\n", errstr);
+    }
+    SM_ASSERT(gameDLL, "Failed to load game.so");
+
+    update_game_ptr = (update_game_type*)dlsym(gameDLL, "update_game");
+    SM_ASSERT(update_game_ptr, "Failed to load update_game function");
+    lastTimestampGameDLL = currentTimestampGameDLL;
+  }
+}

@@ -33,7 +33,7 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
     gameState->playerPos.y += speed;
   }
 
-  draw_sprite(SPRITE_CELESTE_01, gameState->playerPos);
+  draw_sprite(SPRITE_CELESTE_02, gameState->playerPos);
   // draw_quad(gameState.playerPos, {50.0f, 50.0f});
 
   gameState->playerPos.y += 6.0f;

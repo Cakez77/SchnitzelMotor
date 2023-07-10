@@ -1,6 +1,7 @@
 #!/bin/bash
 
 warnings="-Wno-writable-strings -Wno-format-security -Wno-c++11-extensions -Wno-deprecated-declarations"
+timestamp=$(date +%s)
 
 if [[ "$(uname)" == "Linux" ]]; then
     echo "Running on Linux"
@@ -8,6 +9,9 @@ if [[ "$(uname)" == "Linux" ]]; then
     includes="-Ithird_party"
     outputFile=schnitzel
     queryProcesses=$(pgrep $outputFile)
+    # fPIC position independent code 
+    clang++ "src/game.cpp" -shared -fPIC -o game_$timestamp.so $warnings
+    mv game_$timestamp.so game.so
 
 elif [[ "$(uname)" == "Darwin" ]]; then
     echo "Running on Mac"
@@ -25,7 +29,6 @@ else
     outputFile=schnitzel.exe
     queryProcesses=$(tasklist | grep $outputFile)
 
-    timestamp=$(date +%s)
     rm -f game_* # Remove old game_* files
     clang++ "src/game.cpp" -shared -o game_$timestamp.dll $warnings
     mv game_$timestamp.dll game.dll

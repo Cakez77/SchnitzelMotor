@@ -23,6 +23,7 @@
 #define EXPORT_FN __declspec(dllexport)
 #elif __linux__
 #define DEBUG_BREAK() __asm__ volatile ("int3")
+#define EXPORT_FN 
 #elif __APPLE__
 #define DEBUG_BREAK() __builtin_trap()
 #endif
@@ -180,4 +181,29 @@ long long get_timestamp(char* file)
     struct stat file_stat = {};
     stat(file, &file_stat);
     return file_stat.st_mtime;
+}
+
+bool copy_file(char* fileName, char* outputName)
+{
+  int fileSize = 0;
+  char* data = read_file(fileName, &fileSize);
+
+  auto outputFile = fopen(outputName, "wb");
+  if(!outputFile)
+  {
+    SM_ERROR("Failed opening File: %s", outputName);
+    return false;
+  }
+
+  int result = fwrite(data, sizeof(char), fileSize, outputFile);
+  if(!result)
+  {
+    SM_ERROR("Failed opening File: %s", outputName);
+    return false;
+  }
+  
+  fclose(outputFile);
+  free(data);
+
+  return true;
 }
