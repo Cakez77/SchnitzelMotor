@@ -1,6 +1,7 @@
 #pragma once
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 // Used to get the timestamp of a file
 #include <sys/stat.h>
@@ -14,6 +15,7 @@
 #define KB(x) (x) * 1024
 #define MB(x) (x) * KB(x)
 #define GB(x) (x) * MB(x)
+#define ArraySize(x) (sizeof((x)) / sizeof((x)[0]))
 
 // #############################################################################
 //                           Defines
@@ -140,6 +142,16 @@ float approach(float current, float target, float increase)
     max(current - increase, target);
 }
 
+int sign(int x)
+{
+  return (x >= 0)? 1 : -1;
+}
+
+float sign(float x)
+{
+  return (x >= 0.0f)? 1.0f : -1.0f;
+}
+
 struct Vec2
 {
   float x;
@@ -157,9 +169,34 @@ struct IVec2
   int y;
 };
 
+IVec2 operator+(IVec2 a, int scalar)
+{
+  return IVec2{a.x + scalar, a.y + scalar};
+}
+
 Vec2 vec_2(IVec2 ivec2)
 {
   return Vec2{(float)ivec2.x, (float)ivec2.y};
+}
+
+struct Rect
+{
+  Vec2 pos;
+  Vec2 size;
+};
+
+struct IRect
+{
+  IVec2 pos;
+  IVec2 size;
+};
+
+bool rect_collision(IRect a, IRect b)
+{
+  return a.pos.x < b.pos.x  + b.size.x &&
+         a.pos.x + a.size.x > b.pos.x  &&
+         a.pos.y < b.pos.y  + b.size.y &&
+         a.pos.y + a.size.y > b.pos.y;
 }
 
 // #############################################################################

@@ -3,8 +3,22 @@
 #include "input.h"
 #include "render_interface.h"
 
+// #############################################################################
+//                           Game Globals
+// #############################################################################
 static GameState* gameState;
 
+// #############################################################################
+//                           Game Functions
+// #############################################################################
+bool game_input(GameInputType type);
+void update_game_input();
+void move_x();
+IRect get_player_rect();
+
+// #############################################################################
+//                           Update Game (Exported from DLL)
+// #############################################################################
 EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* renderDataIn)
 {
   if(gameState != gameStateIn)
@@ -12,48 +26,78 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
     input = inputIn;
     renderData = renderDataIn;
     gameState = gameStateIn;
+
+    gameState->playerPos = {50, -100};
   }
 
-  // This is on the stack
-  Vec2 speed1;
+  update_game_input();
 
   // This is inside of the data section of the memory, int the exe
   float dt = 1.0f / 60.0f;
   float maxRunSpeed = 10.0f;
-  float runAcceleration = 100.0f;
-  float maxJumpSpeed = -20.0f;
-  float fallSpeed = 20.0f;
-  float gravity = 90.0f;
-  float runReduce = 40.0f;
+  float runAcceleration = 50.0f;
+  float maxJumpSpeed = -18.0f;
+  float fallSpeed = 18.0f;
+  float gravity = 70.0f;
+  float runReduce = 80.0f;
   static Vec2 speed;
-  static bool grounded = true;
   static float highestHeight = input->screenSize.y;
   static float varJumpTimer = 0.0f;
+  static float xRemainder = 0.0f;
+  static float yRemainder = 0.0f;
+
+  static IRect solids [] =
+  {
+    {48 * 2, 48, 48 * 8, 48},
+    {624, 96, 480, 48},
+    {624, 96, 48, 288},
+    {0, 624, 1048, 48},
+    {1048 + 240, 624, 1048, 48},
+    {1040 - 240, 96 * 4, 480, 48},
+    {48 * 3, 48 * 10, 48 * 3, 48},
+    {48 * 5, 48 * 7, 48 * 2, 48},
+    {48 * 9, 48 * 5, 48 * 3, 48},
+  };
+
+  for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
+  {
+    draw_quad(solids[solidIdx].pos, solids[solidIdx].size);
+  }
 
   if(key_pressed_this_frame(KEY_R))
   {
-    gameState->playerPos = {};
+    gameState->playerPos = {0, 200};
   }
 
-  if(key_is_down(KEY_A))
+  float directionChangeMult = 1.6f;
+  if(game_input(INPUT_MOVE_LEFT))
   {
-    speed.x = approach(speed.x, -maxRunSpeed, runAcceleration * dt);
+    float mult = 1.0f;
+    if(speed.x > 0.0f)
+    {
+      mult = directionChangeMult;
+    }
+    speed.x = approach(speed.x, -maxRunSpeed, runAcceleration * mult * dt);
   }
 
-  if(key_is_down(KEY_D))
+  if(game_input(INPUT_MOVE_RIGHT))
   {
-    speed.x = approach(speed.x, maxRunSpeed, runAcceleration * dt);
+    float mult = 1.0f;
+    if(speed.x < 0.0f)
+    {
+      mult = directionChangeMult;
+    }
+    speed.x = approach(speed.x, maxRunSpeed, runAcceleration * mult * dt);
   }
 
-  if(key_pressed_this_frame(KEY_SPACE) &&
-     grounded)
+  if(game_input(INPUT_JUMP))
   {
     varJumpTimer = 0.0f;
     speed.y = maxJumpSpeed;
-    grounded = false;
+    gameState->playerGrounded = false;
   }
 
-  if(key_is_down(KEY_SPACE) &&
+  if(game_input(INPUT_EXTENDED_JUMP) &&
      varJumpTimer < 0.1f)
   {
     speed.y = min(speed.y, maxJumpSpeed);
@@ -71,38 +115,140 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
 
   if(key_is_down(KEY_W))
   {
-    gameState->playerPos.y -= speed.y;
   }
   if(key_is_down(KEY_S))
   {
-    gameState->playerPos.y += speed.y;
   }
 
-  gameState->playerPos.x += speed.x;
-  gameState->playerPos.y += speed.y;
+  SM_TRACE("Speed.x: %.2f", speed.x);
 
-
-  gameState->playerPos.y += 6.0f;
-  if(gameState->playerPos.y > 500.0f - 4.0f * 17.0f)
+  // Move X from https://maddythorson.medium.com/celeste-and-towerfall-physics-d24bd2ae0fc5
   {
-    gameState->playerPos.y = 500.0f - 4.0f * 17.0f;
-    grounded = true;
+    float amount = speed.x;
+    xRemainder += amount; 
+    int move = round(xRemainder);   
+    if (move != 0) 
+    { 
+      xRemainder -= move; 
+      int moveSign = sign(move);
+      while (move != 0) 
+      { 
+        bool collisionHappened = false;
+        for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
+        {
+          IRect playerRect = get_player_rect();
+          IRect newPlayerRect = playerRect;
+          newPlayerRect.pos.x += moveSign;
+          IRect solidRect = solids[solidIdx];
+
+          if(rect_collision(solidRect, newPlayerRect))
+          {
+            collisionHappened = true;
+            break;
+          }
+        }
+
+        if(!collisionHappened)
+        {
+          //There is no Solid immediately beside us, move
+          gameState->playerPos.x += moveSign; 
+          move -= moveSign; 
+        }
+        else
+        {
+          //Hit a solid! Don't move!
+          break;
+        }
+      } 
+    } 
   }
 
-  if(!grounded &&
-     gameState->playerPos.y < highestHeight)
+  // Move Y 
   {
-    highestHeight = gameState->playerPos.y;
+    float amount = speed.y;
+    yRemainder += amount; 
+    int move = round(yRemainder);
+    if (move != 0) 
+    { 
+      yRemainder -= move; 
+      int moveSign = sign(move);
+      while (move != 0) 
+      { 
+        bool collisionHappened = false;
+        for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
+        {
+          IRect playerRect = get_player_rect();
+          IRect newPlayerRect = playerRect;
+          newPlayerRect.pos.y += moveSign;
+          IRect solidRect = solids[solidIdx];
+
+          if(rect_collision(solidRect, newPlayerRect))
+          {
+            collisionHappened = true;
+            break;
+          }
+        }
+
+        if(!collisionHappened)
+        {
+          //There is no Solid immediately beside us, move
+          gameState->playerPos.y += moveSign; 
+          move -= moveSign; 
+        }
+        else
+        {
+          //Hit a solid! Don't move!
+          if(moveSign < 0)
+          {
+            speed.y = 0.0f;
+          }
+          if(moveSign > 0)
+          {
+            gameState->playerGrounded = true;
+          }
+          break;
+        }
+      } 
+    } 
   }
 
-  draw_quad({0.0f, highestHeight + 2.0f}, {input->screenSize.x, 2.0});
-
-  draw_sprite(SPRITE_CELESTE_02, gameState->playerPos);
+  IRect playerRect = get_player_rect();
+  draw_quad(playerRect.pos, playerRect.size);
+  draw_sprite(SPRITE_CELESTE_01, vec_2(gameState->playerPos));
   // draw_quad(gameState.playerPos, {50.0f, 50.0f});
-
-  draw_quad({0.0f, 500.0f}, {input->screenSize.x / 2.0f, 10.0f});
-  draw_quad({input->screenSize.x / 2.0f + 50.0f, 500.0f}, 
-            {input->screenSize.x / 2.0f, 10.0f});
 }
 
+// #############################################################################
+//                           Implementations
+// #############################################################################
+bool game_input(GameInputType type)
+{
+  return gameState->gameInput[type];
+}
 
+void update_game_input()
+{
+  // Moving
+  gameState->gameInput[INPUT_MOVE_LEFT] = input->keys[KEY_A].isDown;
+  gameState->gameInput[INPUT_MOVE_RIGHT] = input->keys[KEY_D].isDown;
+
+  // Jumping
+  gameState->gameInput[INPUT_JUMP] = 
+    input->keys[KEY_SPACE].justPressed && gameState->playerGrounded;
+  gameState->gameInput[INPUT_EXTENDED_JUMP] = input->keys[KEY_SPACE].isDown;
+}
+
+void move_x(float amount) 
+{
+}
+
+IRect get_player_rect()
+{
+  return 
+  {
+    gameState->playerPos.x + 30, 
+    gameState->playerPos.y + 12, 
+    9 * 6, 
+    16 * 6
+  };
+}

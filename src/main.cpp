@@ -88,6 +88,8 @@ int main()
     // Reset Input
     for(int keyIdx = 0; keyIdx < 512; keyIdx++)
     {
+      input->keys[keyIdx].justReleased = false;
+      input->keys[keyIdx].justPressed = false;
       input->keys[keyIdx].halfTransitionCount = 0;
     }
 

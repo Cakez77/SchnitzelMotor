@@ -48,6 +48,9 @@ LRESULT CALLBACK windows_window_callback(HWND window, UINT msg,
       KeyCodes keyCode = KeyCodeLookupTable[wParam];
 
       Key* key = &input->keys[keyCode];
+
+      key->justPressed = !key->justPressed && !key->isDown && isDown;
+      key->justReleased = !key->justReleased && key->isDown && !isDown;
       key->isDown = isDown;
       key->halfTransitionCount++;
 
@@ -183,7 +186,7 @@ bool platform_create_window(int width, int height, char* title)
 
   // Setup and register window class
   HICON icon = LoadIcon(instance, IDI_APPLICATION);
-  WNDCLASS wc = {};
+  WNDCLASSA wc = {};
   wc.hInstance = instance;
   wc.hIcon = icon;
   wc.hCursor = LoadCursor(NULL, IDC_ARROW);
@@ -421,7 +424,7 @@ void platform_reaload_dynamic_library()
       SM_TRACE("Freed game.dll");
     }
 
-    while(!CopyFile("game.dll", "game_load.dll", false)) { Sleep(10); }
+    while(!CopyFileA("game.dll", "game_load.dll", false)) { Sleep(10); }
     SM_TRACE("Copied game.dll");
 
     gameDLL = LoadLibraryA("game_load.dll");

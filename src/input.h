@@ -75,6 +75,8 @@ enum KeyCodes
 struct Key
 {
   b8 isDown;
+  b8 justPressed;
+  b8 justReleased;
   u8 halfTransitionCount;
 };
 

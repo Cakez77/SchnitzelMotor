@@ -10,7 +10,7 @@ if [[ "$(uname)" == "Linux" ]]; then
     outputFile=schnitzel
     queryProcesses=$(pgrep $outputFile)
     # fPIC position independent code 
-    clang++ "src/game.cpp" -shared -fPIC -o game_$timestamp.so $warnings
+    clang++ -g "src/game.cpp" -shared -fPIC -o game_$timestamp.so $warnings
     mv game_$timestamp.so game.so
 
 elif [[ "$(uname)" == "Darwin" ]]; then
@@ -30,7 +30,7 @@ else
     queryProcesses=$(tasklist | grep $outputFile)
 
     rm -f game_* # Remove old game_* files
-    clang++ "src/game.cpp" -shared -o game_$timestamp.dll $warnings
+    clang++ -g "src/game.cpp" -shared -o game_$timestamp.dll $warnings
     mv game_$timestamp.dll game.dll
 fi
 

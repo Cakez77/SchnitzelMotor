@@ -23,11 +23,16 @@ void draw_quad(Vec2 pos, Vec2 size)
   renderData->transforms.add(transform);
 }
 
+void draw_quad(IVec2 pos, IVec2 size)
+{
+  draw_quad(vec_2(pos), vec_2(size));
+}
+
 void draw_sprite(SpriteID spriteID, Vec2 pos)
 {
   Sprite sprite = get_sprite(spriteID);
 
-  Transform transform = {pos, vec_2(sprite.size) * 4.0f, vec_2(sprite.atlasOffset), vec_2(sprite.size)};
+  Transform transform = {pos, vec_2(sprite.size) * 6.0f, vec_2(sprite.atlasOffset), vec_2(sprite.size)};
   renderData->transforms.add(transform);
 }
 
