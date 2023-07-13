@@ -246,9 +246,14 @@ void platform_update_window()
       case KeyPress:
       case KeyRelease:
       {
+        bool isDown = event.type == KeyPress;
         KeyCodes keyCode = KeyCodeLookupTable[event.xkey.keycode];
-        input->keys[keyCode].isDown = event.type == KeyPress;
-        input->keys[keyCode].halfTransitionCount++;
+        Key* key = &input->keys[keyCode];
+
+        key->justPressed = !key->justPressed && !key->isDown && isDown;
+        key->justReleased = !key->justReleased && key->isDown && !isDown;
+        key->isDown = isDown;
+        key->halfTransitionCount++;
 
         break;
       }
