@@ -8,17 +8,23 @@ enum GameInputType
   INPUT_MOVE_LEFT,
   INPUT_MOVE_RIGHT,
   INPUT_JUMP,
-  INPUT_EXTENDED_JUMP,
+  INPUT_WALL_GRAB,
+  INPUT_MOVE_UP,
+  INPUT_MOVE_DOWN,
 
   GAME_INPUT_COUNT
+};
+
+struct GameInput
+{
+  b8 isDown;
+  b8 justPressed;
 };
 
 struct GameState
 {
   IVec2 playerPos;
-  bool playerGrounded = true;
-
-  b8 gameInput[GAME_INPUT_COUNT];
+  GameInput gameInput[GAME_INPUT_COUNT];
 };
 
 extern "C"

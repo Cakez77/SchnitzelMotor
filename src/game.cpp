@@ -11,7 +11,8 @@ static GameState* gameState;
 // #############################################################################
 //                           Game Functions
 // #############################################################################
-bool game_input(GameInputType type);
+bool is_down(GameInputType type);
+bool just_pressed(GameInputType type);
 void update_game_input();
 void move_x();
 IRect get_player_rect();
@@ -30,33 +31,43 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
     gameState->playerPos = {50, -100};
   }
 
+
+
   update_game_input();
 
   // This is inside of the data section of the memory, int the exe
   float dt = 1.0f / 60.0f;
   float maxRunSpeed = 10.0f;
+  float wallJumpSpeed = 15.0f;
   float runAcceleration = 50.0f;
-  float maxJumpSpeed = -18.0f;
+  float fallSideAcceleration = 35.0f;
+  float maxJumpSpeed = -14.0f;
   float fallSpeed = 18.0f;
   float gravity = 70.0f;
   float runReduce = 80.0f;
+  float wallClimbSpeed = -4.0f;
+  float wallSlideDownSpeed = 8.0f;
   static Vec2 speed;
   static float highestHeight = input->screenSize.y;
   static float varJumpTimer = 0.0f;
   static float xRemainder = 0.0f;
   static float yRemainder = 0.0f;
+  static float wallJumpTimer = 0.0f;
+  static bool playerGrounded = true;
+  static bool grabbingWall = false;
 
   static IRect solids [] =
   {
-    {48 * 2, 48, 48 * 8, 48},
-    {624, 96, 480, 48},
-    {624, 96, 48, 288},
+    // {48 * 2, 48, 48 * 8, 48},
+    // {624, 96, 480, 48},
+    {48 * 13, 48 * 2, 48, 48 * 8},
+    {48 *  8, 48 * 2, 48, 48 * 8},
     {0, 624, 1048, 48},
-    {1048 + 240, 624, 1048, 48},
-    {1040 - 240, 96 * 4, 480, 48},
-    {48 * 3, 48 * 10, 48 * 3, 48},
-    {48 * 5, 48 * 7, 48 * 2, 48},
-    {48 * 9, 48 * 5, 48 * 3, 48},
+    // {1048 + 240, 624, 1048, 48},
+    // {1040 - 240, 96 * 4, 480, 48},
+    // {48 * 3, 48 * 10, 48 * 3, 48},
+    // {48 * 5, 48 * 7, 48 * 2, 48},
+    // {48 * 9, 48 * 5, 48 * 3, 48},
   };
 
   for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
@@ -70,57 +81,185 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
   }
 
   float directionChangeMult = 1.6f;
-  if(game_input(INPUT_MOVE_LEFT))
+  if(is_down(INPUT_MOVE_LEFT))
   {
     float mult = 1.0f;
     if(speed.x > 0.0f)
     {
       mult = directionChangeMult;
     }
-    speed.x = approach(speed.x, -maxRunSpeed, runAcceleration * mult * dt);
+
+    if(playerGrounded)
+    {
+      speed.x = approach(speed.x, -maxRunSpeed, runAcceleration * mult * dt);
+    }
+    else
+    {
+      speed.x = approach(speed.x, -maxRunSpeed, fallSideAcceleration * mult * dt);
+    }
+
   }
 
-  if(game_input(INPUT_MOVE_RIGHT))
+  if(is_down(INPUT_MOVE_RIGHT))
   {
     float mult = 1.0f;
     if(speed.x < 0.0f)
     {
       mult = directionChangeMult;
     }
-    speed.x = approach(speed.x, maxRunSpeed, runAcceleration * mult * dt);
-  }
 
-  if(game_input(INPUT_JUMP))
-  {
-    varJumpTimer = 0.0f;
-    speed.y = maxJumpSpeed;
-    gameState->playerGrounded = false;
+    if(playerGrounded)
+    {
+      speed.x = approach(speed.x, maxRunSpeed, runAcceleration * mult * dt);
+    }
+    else
+    {
+      speed.x = approach(speed.x, maxRunSpeed, fallSideAcceleration * mult * dt);
+    }
   }
-
-  if(game_input(INPUT_EXTENDED_JUMP) &&
-     varJumpTimer < 0.1f)
-  {
-    speed.y = min(speed.y, maxJumpSpeed);
-  }
-  varJumpTimer += dt;
-
-  speed.y = approach(speed.y, fallSpeed, gravity * dt);
 
   // firction
-  if(!key_is_down(KEY_A) &&
-     !key_is_down(KEY_D))
+  if(!is_down(INPUT_MOVE_LEFT) &&
+     !is_down(INPUT_MOVE_RIGHT))
   {
     speed.x = approach(speed.x, 0, runReduce * dt);
   }
 
-  if(key_is_down(KEY_W))
+  // Jumping
   {
-  }
-  if(key_is_down(KEY_S))
-  {
+    if(just_pressed(INPUT_JUMP) && playerGrounded)
+    {
+      varJumpTimer = 0.0f;
+      speed.y = maxJumpSpeed;
+      playerGrounded = false;
+      gameState->gameInput[INPUT_JUMP].justPressed = false;
+    }
+
+    if(is_down(INPUT_JUMP) &&
+      varJumpTimer < 0.1f)
+    {
+      speed.y = min(speed.y, maxJumpSpeed);
+    }
+
+    if(just_pressed(INPUT_JUMP))
+    {
+      for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
+      {
+        IRect playerRect = get_player_rect();
+        playerRect.pos.x -= 2 * 6;
+        playerRect.size.x += 4 * 6;
+        IRect solidRect = solids[solidIdx];
+
+        if(rect_collision(solidRect, playerRect))
+        {
+          int playerRectLeft = playerRect.pos.x;
+          int playerRectRight = playerRect.pos.x + playerRect.size.x;
+          int solidRectLeft = solidRect.pos.x;
+          int solidRectRight = solidRect.pos.x + solidRect.size.x;
+
+          // Colliding on the Right
+          if(solidRectRight - playerRectLeft <
+            playerRectRight - solidRectLeft)
+          {
+            wallJumpTimer = 0.1f;
+            varJumpTimer = 0.0f;
+            speed.x = wallJumpSpeed;
+            speed.y = maxJumpSpeed;
+          }
+
+          // Colliding on the Left
+          if(solidRectRight - playerRectLeft >
+            playerRectRight - solidRectLeft)
+          {
+            wallJumpTimer = 0.1f;
+            varJumpTimer = 0.0f;
+            speed.x = -wallJumpSpeed;
+            speed.y = maxJumpSpeed;
+          }
+        }
+      }
+    }
+
+    varJumpTimer += dt;
   }
 
-  SM_TRACE("Speed.x: %.2f", speed.x);
+  // Gravity
+  if(!grabbingWall)
+  {
+    speed.y = approach(speed.y, fallSpeed, gravity * dt);
+  }
+
+  // Wall Grabbing
+  {
+    grabbingWall = false;
+    if(is_down(INPUT_WALL_GRAB) && 
+       wallJumpTimer == 0.0f)
+    {
+      for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
+      {
+        IRect playerRect = get_player_rect();
+        playerRect.pos.x -= 2 * 6;
+        playerRect.size.x += 4 * 6;
+        IRect solidRect = solids[solidIdx];
+
+        if(rect_collision(solidRect, playerRect))
+        {
+          int playerRectLeft = playerRect.pos.x;
+          int playerRectRight = playerRect.pos.x + playerRect.size.x;
+          int solidRectLeft = solidRect.pos.x;
+          int solidRectRight = solidRect.pos.x + solidRect.size.x;
+          
+          // Colliding on the Right
+          if(solidRectRight - playerRectLeft <
+             playerRectRight - solidRectLeft)
+          {
+            speed.x = 0;
+            grabbingWall = true;
+          }
+
+          // Colliding on the Left
+          if(solidRectRight - playerRectLeft >
+             playerRectRight - solidRectLeft)
+          {
+            speed.x = 0;
+            grabbingWall = true;
+          }
+        }
+      }
+    }
+
+    wallJumpTimer = max(0.0f, wallJumpTimer - dt);
+
+    if(grabbingWall &&
+      is_down(INPUT_MOVE_UP))
+    {
+      float mult = 1.0f;
+      if(speed.y > 0.0f)
+      {
+        mult = directionChangeMult;
+      }
+      speed.y = approach(speed.y, wallClimbSpeed, runAcceleration * mult * dt);
+    }
+
+    if(grabbingWall &&
+      is_down(INPUT_MOVE_DOWN))
+    {
+      float mult = 1.0f;
+      if(speed.y < 0.0f)
+      {
+        mult = directionChangeMult;
+      }
+      speed.y = approach(speed.y, wallSlideDownSpeed, runAcceleration * mult * dt);
+    }
+
+    // firction
+    if(grabbingWall &&
+      !is_down(INPUT_MOVE_UP) &&
+      !is_down(INPUT_MOVE_DOWN))
+    {
+      speed.y = approach(speed.y, 0, runReduce * dt);
+    }
+  }
 
   // Move X from https://maddythorson.medium.com/celeste-and-towerfall-physics-d24bd2ae0fc5
   {
@@ -191,20 +330,20 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
 
         if(!collisionHappened)
         {
-          //There is no Solid immediately beside us, move
+          // There is no Solid immediately beside us, move
           gameState->playerPos.y += moveSign; 
           move -= moveSign; 
         }
         else
         {
-          //Hit a solid! Don't move!
+          // Hit a solid! Don't move!
           if(moveSign < 0)
           {
             speed.y = 0.0f;
           }
           if(moveSign > 0)
           {
-            gameState->playerGrounded = true;
+            playerGrounded = true;
           }
           break;
         }
@@ -221,21 +360,39 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
 // #############################################################################
 //                           Implementations
 // #############################################################################
-bool game_input(GameInputType type)
+bool is_down(GameInputType type)
 {
-  return gameState->gameInput[type];
+  return gameState->gameInput[type].isDown;
+}
+
+bool just_pressed(GameInputType type)
+{
+  return gameState->gameInput[type].justPressed;
 }
 
 void update_game_input()
 {
   // Moving
-  gameState->gameInput[INPUT_MOVE_LEFT] = input->keys[KEY_A].isDown;
-  gameState->gameInput[INPUT_MOVE_RIGHT] = input->keys[KEY_D].isDown;
+  gameState->gameInput[INPUT_MOVE_LEFT].isDown = input->keys[KEY_A].isDown;
+  gameState->gameInput[INPUT_MOVE_RIGHT].isDown = input->keys[KEY_D].isDown;
+  gameState->gameInput[INPUT_MOVE_UP].isDown = input->keys[KEY_W].isDown;
+  gameState->gameInput[INPUT_MOVE_DOWN].isDown = input->keys[KEY_S].isDown;
+  gameState->gameInput[INPUT_MOVE_LEFT].isDown |= input->keys[KEY_LEFT].isDown;
+  gameState->gameInput[INPUT_MOVE_RIGHT].isDown |= input->keys[KEY_RIGHT].isDown;
+  gameState->gameInput[INPUT_MOVE_UP].isDown |= input->keys[KEY_UP].isDown;
+  gameState->gameInput[INPUT_MOVE_DOWN].isDown |= input->keys[KEY_DOWN].isDown;
 
   // Jumping
-  gameState->gameInput[INPUT_JUMP] = 
-    input->keys[KEY_SPACE].justPressed && gameState->playerGrounded;
-  gameState->gameInput[INPUT_EXTENDED_JUMP] = input->keys[KEY_SPACE].isDown;
+  gameState->gameInput[INPUT_JUMP].justPressed = 
+    input->keys[KEY_SPACE].justPressed;
+  gameState->gameInput[INPUT_JUMP].isDown = 
+    input->keys[KEY_SPACE].isDown;
+
+  // Wall Grabbing
+  gameState->gameInput[INPUT_WALL_GRAB].isDown =
+    input->keys[KEY_E].isDown;
+  gameState->gameInput[INPUT_WALL_GRAB].isDown |=
+    input->keys[KEY_Q].isDown;
 }
 
 void move_x(float amount) 

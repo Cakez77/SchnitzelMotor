@@ -1,7 +1,7 @@
 
 #include <X11/Xlib.h>
 #include <GL/glx.h>
-#include <dlfcn.h>
+#include <dlfcn.h>  // for loading the so (DLL) file
 #include <unistd.h> // for sleep
 
 // #############################################################################

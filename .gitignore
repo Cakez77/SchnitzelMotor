@@ -3,6 +3,7 @@ project.4coder
 *.ilk
 *.exe
 *.zip
+*.pdb
 *.exp
 *.obj
 *.o
