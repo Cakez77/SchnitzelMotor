@@ -5,10 +5,12 @@
 //                           OpenGL Function Pointers
 // #############################################################################
 static PFNGLCREATEPROGRAMPROC glCreateProgram_ptr;
-static PFNGLDELETETEXTURESPROC glDeleteTextures_ptr;
-static PFNGLGENTEXTURESPROC glGenTextures_ptr;
-static PFNGLBINDTEXTUREPROC glBindTexture_ptr;
-static PFNGLDRAWBUFFERPROC glDrawBuffer_ptr;
+
+// @Note(tkap, 13/07/2023): These functions fail for me
+// static PFNGLDELETETEXTURESPROC glDeleteTextures_ptr;
+// static PFNGLGENTEXTURESPROC glGenTextures_ptr;
+// static PFNGLBINDTEXTUREPROC glBindTexture_ptr;
+// static PFNGLDRAWBUFFERPROC glDrawBuffer_ptr;
 static PFNGLDRAWARRAYSPROC glDrawArrays_ptr;
 static PFNGLCREATESHADERPROC glCreateShader_ptr;
 static PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation_ptr;
@@ -63,10 +65,12 @@ void load_gl_functions()
 {
   // Load OpenGL Functions from the Operating System / Graphics Card
   glCreateProgram_ptr = (PFNGLCREATEPROGRAMPROC)platform_load_gl_func("glCreateProgram");
-  glDeleteTextures_ptr = (PFNGLDELETETEXTURESPROC)platform_load_gl_func("glDeleteTextures");
-  glGenTextures_ptr = (PFNGLGENTEXTURESPROC)platform_load_gl_func("glGenTextures");
-  glBindTexture_ptr = (PFNGLBINDTEXTUREPROC)platform_load_gl_func("glBindTexture");
-  glDrawArrays_ptr = (PFNGLDRAWARRAYSPROC)platform_load_gl_func("glDrawArrays");
+
+  // @Note(tkap, 13/07/2023): Fails for me
+//   glDeleteTextures_ptr = (PFNGLDELETETEXTURESPROC)platform_load_gl_func("glDeleteTextures");
+//   glGenTextures_ptr = (PFNGLGENTEXTURESPROC)platform_load_gl_func("glGenTextures");
+//   glBindTexture_ptr = (PFNGLBINDTEXTUREPROC)platform_load_gl_func("glBindTexture");
+//   glDrawArrays_ptr = (PFNGLDRAWARRAYSPROC)platform_load_gl_func("glDrawArrays");
   glCreateShader_ptr = (PFNGLCREATESHADERPROC) platform_load_gl_func("glCreateShader");
   glGetUniformLocation_ptr = (PFNGLGETUNIFORMLOCATIONPROC) platform_load_gl_func("glGetUniformLocation");
   glUniform1f_ptr = (PFNGLUNIFORM1FPROC) platform_load_gl_func("glUniform1f");
@@ -124,25 +128,26 @@ GLAPI GLuint APIENTRY glCreateProgram (void)
   return glCreateProgram_ptr();
 }
 
-GLAPI void APIENTRY glDeleteTextures (GLsizei n, const GLuint *textures)
-{
-  glDeleteTextures_ptr(n, textures);
-}
+// @Note(tkap, 13/07/2023): These functions fail for me
+// GLAPI void APIENTRY glDeleteTextures (GLsizei n, const GLuint *textures)
+// {
+//   glDeleteTextures_ptr(n, textures);
+// }
 
-GLAPI void APIENTRY glGenTextures (GLsizei n, GLuint *textures)
-{
-  glGenTextures_ptr(n, textures);
-}
+// GLAPI void APIENTRY glGenTextures (GLsizei n, GLuint *textures)
+// {
+//   glGenTextures_ptr(n, textures);
+// }
 
-GLAPI void APIENTRY glBindTexture (GLenum target, GLuint texture)
-{
-  glBindTexture_ptr(target, texture);
-}
+// GLAPI void APIENTRY glBindTexture (GLenum target, GLuint texture)
+// {
+//   glBindTexture_ptr(target, texture);
+// }
 
-void glDrawArrays(GLenum mode, GLint first, GLsizei count)
-{
-    glDrawArrays_ptr(mode, first, count);
-}
+// void glDrawArrays(GLenum mode, GLint first, GLsizei count)
+// {
+//     glDrawArrays_ptr(mode, first, count);
+// }
 
 GLuint glCreateShader(GLenum shaderType)
 {

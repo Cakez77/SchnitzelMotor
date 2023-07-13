@@ -1,3 +1,4 @@
+#include "sound.h"
 #include "game.h"
 #include "assets.h"
 #include "input.h"
@@ -20,7 +21,7 @@ IRect get_player_rect();
 // #############################################################################
 //                           Update Game (Exported from DLL)
 // #############################################################################
-EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* renderDataIn)
+EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* renderDataIn, BumpAllocator* allocator, PlaySoundFunc play_sound)
 {
   if(gameState != gameStateIn)
   {
@@ -28,6 +29,13 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
     renderData = renderDataIn;
     gameState = gameStateIn;
 
+  }
+
+  if(!gameState->initialized)
+  {
+    gameState->initialized = true;
+    gameState->jumpSound = load_wav("assets/sounds/jump.wav", allocator);
+    gameState->wallJumpSound = load_wav("assets/sounds/wall.wav", allocator);
     gameState->playerPos = {50, -100};
   }
 
@@ -129,6 +137,7 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
   {
     if(just_pressed(INPUT_JUMP) && playerGrounded)
     {
+      play_sound(gameState->jumpSound);
       varJumpTimer = 0.0f;
       speed.y = maxJumpSpeed;
       playerGrounded = false;
@@ -165,6 +174,7 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
             varJumpTimer = 0.0f;
             speed.x = wallJumpSpeed;
             speed.y = maxJumpSpeed;
+            play_sound(gameState->wallJumpSound);
           }
 
           // Colliding on the Left
@@ -175,6 +185,7 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
             varJumpTimer = 0.0f;
             speed.x = -wallJumpSpeed;
             speed.y = maxJumpSpeed;
+            play_sound(gameState->wallJumpSound);
           }
         }
       }
@@ -192,7 +203,7 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
   // Wall Grabbing
   {
     grabbingWall = false;
-    if(is_down(INPUT_WALL_GRAB) && 
+    if(is_down(INPUT_WALL_GRAB) &&
        wallJumpTimer == 0.0f)
     {
       for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
@@ -208,7 +219,7 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
           int playerRectRight = playerRect.pos.x + playerRect.size.x;
           int solidRectLeft = solidRect.pos.x;
           int solidRectRight = solidRect.pos.x + solidRect.size.x;
-          
+
           // Colliding on the Right
           if(solidRectRight - playerRectLeft <
              playerRectRight - solidRectLeft)
@@ -264,14 +275,14 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
   // Move X from https://maddythorson.medium.com/celeste-and-towerfall-physics-d24bd2ae0fc5
   {
     float amount = speed.x;
-    xRemainder += amount; 
-    int move = round(xRemainder);   
-    if (move != 0) 
-    { 
-      xRemainder -= move; 
+    xRemainder += amount;
+    int move = round(xRemainder);
+    if (move != 0)
+    {
+      xRemainder -= move;
       int moveSign = sign(move);
-      while (move != 0) 
-      { 
+      while (move != 0)
+      {
         bool collisionHappened = false;
         for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
         {
@@ -290,29 +301,29 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
         if(!collisionHappened)
         {
           //There is no Solid immediately beside us, move
-          gameState->playerPos.x += moveSign; 
-          move -= moveSign; 
+          gameState->playerPos.x += moveSign;
+          move -= moveSign;
         }
         else
         {
           //Hit a solid! Don't move!
           break;
         }
-      } 
-    } 
+      }
+    }
   }
 
-  // Move Y 
+  // Move Y
   {
     float amount = speed.y;
-    yRemainder += amount; 
+    yRemainder += amount;
     int move = round(yRemainder);
-    if (move != 0) 
-    { 
-      yRemainder -= move; 
+    if (move != 0)
+    {
+      yRemainder -= move;
       int moveSign = sign(move);
-      while (move != 0) 
-      { 
+      while (move != 0)
+      {
         bool collisionHappened = false;
         for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
         {
@@ -331,8 +342,8 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
         if(!collisionHappened)
         {
           // There is no Solid immediately beside us, move
-          gameState->playerPos.y += moveSign; 
-          move -= moveSign; 
+          gameState->playerPos.y += moveSign;
+          move -= moveSign;
         }
         else
         {
@@ -347,8 +358,8 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
           }
           break;
         }
-      } 
-    } 
+      }
+    }
   }
 
   IRect playerRect = get_player_rect();
@@ -383,9 +394,9 @@ void update_game_input()
   gameState->gameInput[INPUT_MOVE_DOWN].isDown |= input->keys[KEY_DOWN].isDown;
 
   // Jumping
-  gameState->gameInput[INPUT_JUMP].justPressed = 
+  gameState->gameInput[INPUT_JUMP].justPressed =
     input->keys[KEY_SPACE].justPressed;
-  gameState->gameInput[INPUT_JUMP].isDown = 
+  gameState->gameInput[INPUT_JUMP].isDown =
     input->keys[KEY_SPACE].isDown;
 
   // Wall Grabbing
@@ -395,17 +406,17 @@ void update_game_input()
     input->keys[KEY_Q].isDown;
 }
 
-void move_x(float amount) 
+void move_x(float amount)
 {
 }
 
 IRect get_player_rect()
 {
-  return 
+  return
   {
-    gameState->playerPos.x + 30, 
-    gameState->playerPos.y + 12, 
-    9 * 6, 
+    gameState->playerPos.x + 30,
+    gameState->playerPos.y + 12,
+    9 * 6,
     16 * 6
   };
 }

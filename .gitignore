@@ -23,3 +23,7 @@ build
 *.xcuserstate
 *.xcworkspace
 *.xcodeproj/
+
+# Tkap
+generate_ctags.bat
+.tags

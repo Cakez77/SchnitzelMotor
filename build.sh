@@ -9,7 +9,7 @@ if [[ "$(uname)" == "Linux" ]]; then
     includes="-Ithird_party"
     outputFile=schnitzel
     queryProcesses=$(pgrep $outputFile)
-    # fPIC position independent code 
+    # fPIC position independent code
     clang++ -g "src/game.cpp" -shared -fPIC -o game_$timestamp.so $warnings
     mv game_$timestamp.so game.so
 
@@ -28,6 +28,8 @@ else
     includes="-Ithird_party"
     outputFile=schnitzel.exe
     queryProcesses=$(tasklist | grep $outputFile)
+
+    warnings="$warnings -Wno-microsoft-exception-spec"
 
     rm -f game_* # Remove old game_* files
     clang++ -g "src/game.cpp" -shared -o game_$timestamp.dll $warnings

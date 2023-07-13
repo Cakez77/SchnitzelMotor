@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <math.h>
 
+// @Note(tkap, 13/07/2023): Needed for memset
+#include <string.h>
+
 // Used to get the timestamp of a file
 #include <sys/stat.h>
 
@@ -25,7 +28,7 @@
 #define EXPORT_FN __declspec(dllexport)
 #elif __linux__
 #define DEBUG_BREAK() __asm__ volatile ("int3")
-#define EXPORT_FN 
+#define EXPORT_FN
 #elif __APPLE__
 #define DEBUG_BREAK() __builtin_trap()
 #endif
@@ -137,8 +140,8 @@ float max(float a, float b)
 
 float approach(float current, float target, float increase)
 {
-  return current < target? 
-    min(current + increase, target) : 
+  return current < target?
+    min(current + increase, target) :
     max(current - increase, target);
 }
 
@@ -190,6 +193,36 @@ struct IRect
   IVec2 pos;
   IVec2 size;
 };
+
+struct BumpAllocator
+{
+  size_t capacity;
+  size_t used;
+  char* memory;
+};
+
+BumpAllocator make_bump_allocator(size_t inSize, bool zeroMemory)
+{
+  size_t alignedSize = (inSize + 7) & ~7;
+  BumpAllocator result = {};
+  result.capacity = alignedSize;
+  result.memory = (char*)malloc(alignedSize);
+  SM_ASSERT(result.memory, "malloc failed. Dats bik problem Okayeg");
+  if(zeroMemory)
+  {
+    memset(result.memory, 0, alignedSize);
+  }
+  return result;
+}
+
+char* bump_alloc(BumpAllocator* allocator, size_t inSize)
+{
+  size_t alignedSize = (inSize + 7) & ~7;
+  SM_ASSERT(allocator->used + alignedSize <= allocator->capacity, "Bump allocator is full");
+  char* result = allocator->memory + allocator->used;
+  allocator->used += alignedSize;
+  return result;
+}
 
 bool rect_collision(IRect a, IRect b)
 {
@@ -255,7 +288,7 @@ bool copy_file(char* fileName, char* outputName)
     SM_ERROR("Failed opening File: %s", outputName);
     return false;
   }
-  
+
   fclose(outputFile);
   free(data);
 

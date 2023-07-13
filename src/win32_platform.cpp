@@ -1,8 +1,40 @@
 
+#pragma comment(lib, "Ole32.lib")
+
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+#include <xaudio2.h>
 #include "wglext.h"
+
+// #############################################################################
+//                           Platform Structs
+// #############################################################################
+struct Voice : IXAudio2VoiceCallback
+{
+	IXAudio2SourceVoice* voice;
+
+	volatile int playing;
+
+	void OnStreamEnd()
+	{
+		voice->Stop();
+		InterlockedExchange((LONG*)&playing, false);
+	}
+
+	void OnBufferStart(void * pBufferContext)
+	{
+		InterlockedExchange((LONG*)&playing, true);
+	}
+
+	#pragma warning(push, 0)
+	void OnVoiceProcessingPassEnd() { }
+	void OnVoiceProcessingPassStart(UINT32 SamplesRequired) {  }
+	void OnBufferEnd(void * pBufferContext) {  }
+	void OnLoopEnd(void * pBufferContext) {  }
+	void OnVoiceError(void * pBufferContext, HRESULT Error) { }
+	#pragma warning(pop)
+};
 
 // #############################################################################
 //                           Windows Globals
@@ -10,6 +42,7 @@
 static HWND window;
 static HDC dc;
 static PFNGLDEBUGMESSAGECALLBACKPROC glDebugMessageCallback_ptr;
+static Voice voiceArr[MAX_CONCURRENT_SOUNDS];
 
 // #############################################################################
 //                           Platform Implementations
@@ -72,7 +105,7 @@ void platform_fill_keycode_lookup_table()
   KeyCodeLookupTable[VK_LBUTTON] = KEY_LEFT_MOUSE;
   KeyCodeLookupTable[VK_MBUTTON] = KEY_MIDDLE_MOUSE;
   KeyCodeLookupTable[VK_RBUTTON] = KEY_RIGHT_MOUSE;
-  
+
   KeyCodeLookupTable['A'] = KEY_A;
   KeyCodeLookupTable['B'] = KEY_B;
   KeyCodeLookupTable['C'] = KEY_C;
@@ -142,19 +175,19 @@ void platform_fill_keycode_lookup_table()
   KeyCodeLookupTable[VK_NUMLOCK] = KEY_NUM_LOCK,
   KeyCodeLookupTable[VK_SCROLL] = KEY_SCROLL_LOCK,
   KeyCodeLookupTable[VK_APPS] = KEY_MENU,
-  
+
   KeyCodeLookupTable[VK_SHIFT] = KEY_SHIFT,
   KeyCodeLookupTable[VK_LSHIFT] = KEY_SHIFT,
   KeyCodeLookupTable[VK_RSHIFT] = KEY_SHIFT,
-  
+
   KeyCodeLookupTable[VK_CONTROL] = KEY_CONTROL,
   KeyCodeLookupTable[VK_LCONTROL] = KEY_CONTROL,
   KeyCodeLookupTable[VK_RCONTROL] = KEY_CONTROL,
-  
+
   KeyCodeLookupTable[VK_MENU] = KEY_ALT,
   KeyCodeLookupTable[VK_LMENU] = KEY_ALT,
   KeyCodeLookupTable[VK_RMENU] = KEY_ALT,
-  
+
   KeyCodeLookupTable[VK_F1] = KEY_F1;
   KeyCodeLookupTable[VK_F2] = KEY_F2;
   KeyCodeLookupTable[VK_F3] = KEY_F3;
@@ -167,7 +200,7 @@ void platform_fill_keycode_lookup_table()
   KeyCodeLookupTable[VK_F10] = KEY_F10;
   KeyCodeLookupTable[VK_F11] = KEY_F11;
   KeyCodeLookupTable[VK_F12] = KEY_F12;
-  
+
   KeyCodeLookupTable[VK_NUMPAD0] = KEY_NUMPAD_0;
   KeyCodeLookupTable[VK_NUMPAD1] = KEY_NUMPAD_1;
   KeyCodeLookupTable[VK_NUMPAD2] = KEY_NUMPAD_2;
@@ -369,6 +402,10 @@ bool platform_create_window(int width, int height, char* title)
       SM_ASSERT(0, "Faield to wglMakeCurrent");
       return false;
     }
+
+    // @Note(tkap, 13/07/2023): Load and call the vsync function. Your (cakez77) driver must be forcing vsync on all the time,
+    // because you are not setting anywhere. This makes the game unplayable for everyone who doesn't have forced vsync. This fixes it.
+    ((PFNWGLSWAPINTERVALEXTPROC)platform_load_gl_func("wglSwapIntervalEXT"))(1);
   }
 
   ShowWindow(window, SW_SHOW);
@@ -434,4 +471,77 @@ void platform_reaload_dynamic_library()
     SM_ASSERT(update_game_ptr, "Failed to load update_game function");
     lastTimestampGameDLL = currentTimestampGameDLL;
   }
+}
+
+
+bool thread_safe_set_bool_to_true(volatile int* var)
+{
+	return InterlockedCompareExchange((LONG*)var, true, false) == false;
+}
+
+bool play_sound(Sound sound)
+{
+	SM_ASSERT(sound.sampleCount > 0, "Sound has no samples");
+	SM_ASSERT(sound.samples, "Sound has no samples");
+
+	XAUDIO2_BUFFER buffer = {};
+	buffer.Flags = XAUDIO2_END_OF_STREAM;
+	buffer.AudioBytes = sound.sampleCount * NUM_CHANNELS * sizeof(short);
+	buffer.pAudioData = (BYTE*)sound.samples;
+
+	Voice* currVoice = nullptr;
+	for(int voiceIdx = 0; voiceIdx < MAX_CONCURRENT_SOUNDS; voiceIdx++)
+	{
+		Voice* voice = &voiceArr[voiceIdx];
+		if(!voice->playing)
+		{
+			if(thread_safe_set_bool_to_true(&voice->playing))
+			{
+				currVoice = voice;
+				break;
+			}
+		}
+	}
+
+	if(currVoice == nullptr) { return false; }
+
+	HRESULT hr = currVoice->voice->SubmitSourceBuffer(&buffer);
+	if(FAILED(hr)) { return false; }
+
+	currVoice->voice->Start();
+
+	return true;
+}
+
+bool platform_init_sound()
+{
+	HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+	if(FAILED(hr)) { return false; }
+
+	IXAudio2* xaudio2 = nullptr;
+	hr = XAudio2Create(&xaudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
+	if(FAILED(hr)) { return false; }
+
+	IXAudio2MasteringVoice* master_voice = nullptr;
+	hr = xaudio2->CreateMasteringVoice(&master_voice);
+	if(FAILED(hr)) { return false; }
+
+	WAVEFORMATEX wave = {};
+	wave.wFormatTag = WAVE_FORMAT_PCM;
+	wave.nChannels = NUM_CHANNELS;
+	wave.nSamplesPerSec = SAMPLE_RATE;
+	wave.wBitsPerSample = 16;
+	wave.nBlockAlign = (NUM_CHANNELS * wave.wBitsPerSample) / 8;
+	wave.nAvgBytesPerSec = SAMPLE_RATE * wave.nBlockAlign;
+
+	for(int voiceIdx = 0; voiceIdx < MAX_CONCURRENT_SOUNDS; voiceIdx++)
+	{
+		Voice* voice = &voiceArr[voiceIdx];
+		hr = xaudio2->CreateSourceVoice(&voice->voice, &wave, 0, XAUDIO2_DEFAULT_FREQ_RATIO, voice, nullptr, nullptr);
+		voice->voice->SetVolume(0.25f);
+		if(FAILED(hr)) { return false; }
+	}
+
+	return true;
+
 }

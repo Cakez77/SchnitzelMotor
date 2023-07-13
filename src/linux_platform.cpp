@@ -158,22 +158,22 @@ void platform_fill_keycode_lookup_table()
   KeyCodeLookupTable[XKeysymToKeycode(display, XK_KP_8)] = KEY_NUMPAD_8;
   KeyCodeLookupTable[XKeysymToKeycode(display, XK_KP_9)] = KEY_NUMPAD_9;
 }
-  
+
 
 bool platform_create_window(int width, int height, char* title)
 {
   display = XOpenDisplay(NULL);
-  window = XCreateSimpleWindow(display, 
+  window = XCreateSimpleWindow(display,
                                DefaultRootWindow(display),
                                10,      // xPos
                                10,      // yPos
-                               width, 
+                               width,
                                height,
                                0,       // border width
                                0,       // border
                                0);       // background
 
-  int pixelAttribs[] = 
+  int pixelAttribs[] =
   {
     // GLX_RGBA,           True, // Aparently this doesn't work on all Linux Systems, have to test
     GLX_DOUBLEBUFFER,   True,
@@ -187,7 +187,7 @@ bool platform_create_window(int width, int height, char* title)
   GLXFBConfig *fbc = glXChooseFBConfig(display, DefaultScreen(display),
                                        pixelAttribs, &fbcCount);
 
-  if (!fbc) 
+  if (!fbc)
   {
     SM_ASSERT(0, "glXChooseFBConfig() failed");
     return false;
@@ -197,12 +197,12 @@ bool platform_create_window(int width, int height, char* title)
     (PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB");
 
   // Set desired minimum OpenGL version
-  int contextAttribs[] = 
+  int contextAttribs[] =
   {
     GLX_CONTEXT_MAJOR_VERSION_ARB, 4,
     GLX_CONTEXT_MINOR_VERSION_ARB, 3,
     GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_CORE_PROFILE_BIT_ARB,
-    GLX_CONTEXT_FLAGS_ARB, GLX_CONTEXT_DEBUG_BIT_ARB, 
+    GLX_CONTEXT_FLAGS_ARB, GLX_CONTEXT_DEBUG_BIT_ARB,
     None
   };
 
@@ -210,7 +210,7 @@ bool platform_create_window(int width, int height, char* title)
   GLXContext ctx = glXCreateContextAttribsARB(display, fbc[0], NULL, true, contextAttribs);
 
   // Set the input mask for our window on the current display
-  // ExposureMask | KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask | 
+  // ExposureMask | KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask |
   // PointerMotionMask | ButtonMotionMask | FocusChangeMask
   long event_mask = KeyPressMask | KeyReleaseMask | KeymapStateMask | ExposureMask;
   XSelectInput(display, window, event_mask);
@@ -313,8 +313,8 @@ void platform_reaload_dynamic_library()
     SM_TRACE("Copied game.dll");
 
     gameDLL = dlopen("./game_load.so", RTLD_NOW);
-    char *errstr = dlerror(); 
-    if (errstr != NULL) 
+    char *errstr = dlerror();
+    if (errstr != NULL)
     {
       printf ("A dynamic linking error occurred: (%s)\n", errstr);
     }
@@ -324,4 +324,14 @@ void platform_reaload_dynamic_library()
     SM_ASSERT(update_game_ptr, "Failed to load update_game function");
     lastTimestampGameDLL = currentTimestampGameDLL;
   }
+}
+
+bool play_sound(Sound sound)
+{
+  return false;
+}
+
+bool platform_init_sound()
+{
+  return false;
 }

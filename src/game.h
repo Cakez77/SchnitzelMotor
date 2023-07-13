@@ -23,13 +23,16 @@ struct GameInput
 
 struct GameState
 {
+  bool initialized;
   IVec2 playerPos;
   GameInput gameInput[GAME_INPUT_COUNT];
+  Sound jumpSound;
+  Sound wallJumpSound;
 };
 
 extern "C"
 {
-  EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* renderDataIn);
+  EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* renderDataIn, BumpAllocator* allocator, PlaySoundFunc play_sound);
 }
 
 

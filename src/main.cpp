@@ -1,5 +1,6 @@
 #include "schnitzel_lib.h"
 #include "input.h"
+#include "sound.h"
 #include "game.h"
 #include "render_interface.h"
 
@@ -51,25 +52,25 @@ void platform_reaload_dynamic_library();
 
 int main()
 {
-  int allocationByteOffset = 0;
-  char* gameMemory = (char*)malloc(MB(256));
-  memset(gameMemory, 0, MB(256));
+  BumpAllocator allocator = make_bump_allocator(MB(256), true);
 
-  GameState * gameState = (GameState*)&gameMemory[allocationByteOffset];
-  allocationByteOffset += sizeof(GameState);
+  GameState* gameState = (GameState*)bump_alloc(&allocator, sizeof(GameState));
 
   // Defined in the file render_interface.h
-  renderData = (RenderData*)&gameMemory[allocationByteOffset];
-  allocationByteOffset += sizeof(RenderData);
+  renderData = (RenderData*)bump_alloc(&allocator, sizeof(RenderData));
 
   // Defiend in "input.h"
-  input = (Input*)&gameMemory[allocationByteOffset];
-  allocationByteOffset += sizeof(Input);
+  input = (Input*)bump_alloc(&allocator, sizeof(Input));
 
   if(!platform_create_window(1200, 720, "Schnitzel Motor"))
   {
     SM_ERROR("Failed to create Windows Window");
     return -1;
+  }
+
+  if(!platform_init_sound())
+  {
+    SM_ERROR("Failed to initialize sound");
   }
 
   platform_fill_keycode_lookup_table();
@@ -94,7 +95,7 @@ int main()
     }
 
     platform_update_window();
-    update_game(gameState, input, renderData);
+    update_game(gameState, input, renderData, &allocator, play_sound);
     gl_render();
 
     // This is platform specific!
@@ -104,7 +105,7 @@ int main()
   return 0;
 }
 
-void update_game(GameState* gameState, Input* inputIn, RenderData* renderDataIn)
+void update_game(GameState* gameState, Input* inputIn, RenderData* renderDataIn, BumpAllocator* allocator, PlaySoundFunc play_sound)
 {
-  update_game_ptr(gameState, inputIn, renderDataIn);
+  update_game_ptr(gameState, inputIn, renderDataIn, allocator, play_sound);
 }
