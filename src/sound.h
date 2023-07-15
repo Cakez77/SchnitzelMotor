@@ -17,7 +17,7 @@ enum SoundOptionBits
 {
 	SOUND_OPTION_FADE_OUT = BIT(0),
 	SOUND_OPTION_FADE_IN = BIT(1),
-	SOUND_OPTION_START = BIT(0),
+	SOUND_OPTION_START = BIT(2),
 };
 typedef int SoundOptions;
 

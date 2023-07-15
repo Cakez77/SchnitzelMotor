@@ -498,7 +498,7 @@ bool platform_init_audio()
 	{
 		xAudioVoice* voice = &voiceArr[voiceIdx];
 		hr = xaudio2->CreateSourceVoice(&voice->voice, &wave, 0, XAUDIO2_DEFAULT_FREQ_RATIO, voice, nullptr, nullptr);
-		voice->voice->SetVolume(0.25f);
+		voice->voice->SetVolume(musicVolume);
 		if(FAILED(hr)) { return false; }
 	}
 
@@ -548,6 +548,7 @@ void platform_update_audio(float dt)
         if(!FAILED(hr)) 
         {
           voice->voice->Start();
+          voice->soundPath = sound->path;
 		      InterlockedExchange((LONG*)&voice->playing, true);
         }
       }
@@ -560,9 +561,14 @@ void platform_update_audio(float dt)
       for(int voiceIdx = 0; voiceIdx < MAX_CONCURRENT_SOUNDS; voiceIdx++)
       {
         xAudioVoice* possibleVoice = &voiceArr[voiceIdx];
+        if(!possibleVoice->playing)
+        {
+          continue;
+        }
+
         if(strcmp(possibleVoice->soundPath, sound->path) == 0)
         {
-          voice->options = SOUND_OPTION_FADE_OUT;
+          possibleVoice->options = SOUND_OPTION_FADE_OUT;
         }
       }
     }
@@ -577,11 +583,12 @@ void platform_update_audio(float dt)
     {
       voice->fadeTimer = min(voice->fadeTimer + dt, FADE_DURATION);
       float t = voice->fadeTimer / FADE_DURATION;
-      voice->voice->SetVolume(t);
+      voice->voice->SetVolume(t * musicVolume);
 
       if(voice->fadeTimer == FADE_DURATION)
       {
         voice->options ^= SOUND_OPTION_FADE_IN;
+        voice->fadeTimer = 0.0f;
       }
 
       // If some clown sets both options, SOUND_OPTION_FADE_IN will start
@@ -591,16 +598,17 @@ void platform_update_audio(float dt)
 
     if(voice->options & SOUND_OPTION_FADE_OUT)
     {
-      voice->fadeTimer = max(voice->fadeTimer - dt, 0.0f);
-      float t = voice->fadeTimer / FADE_DURATION;
-      voice->voice->SetVolume(t);
+      voice->fadeTimer = min(voice->fadeTimer + dt, FADE_DURATION);
+      float t = 1.0f - voice->fadeTimer / FADE_DURATION;
+      voice->voice->SetVolume(t * musicVolume);
 
-      if(voice->fadeTimer == 0.0f)
+      if(voice->fadeTimer == FADE_DURATION)
       {
         voice->options ^= SOUND_OPTION_FADE_OUT;
         voice->voice->Stop();
         voice->voice->FlushSourceBuffers(); // Remove the buffer from the voice
         voice->voice->SetVolume(1.0f); // Reset Volume
+        voice->fadeTimer = 0.0f;
       }
     }
   }

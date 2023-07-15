@@ -30,6 +30,7 @@ static KeyCodes KeyCodeLookupTable[MAX_KEYCODES];
 static update_game_type* update_game_ptr;
 static BumpAllocator transientStorage;
 static BumpAllocator persistentStorage;
+static float musicVolume = 0.25f;
 
 // #############################################################################
 //                           Platform Functions
