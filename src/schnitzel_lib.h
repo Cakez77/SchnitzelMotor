@@ -6,15 +6,25 @@
 // Used to get the timestamp of a file
 #include <sys/stat.h>
 
+// Used to get memset
+#include <string.h>
+
+// #############################################################################
+//                           Constants
+// #############################################################################
+// WAV Files
+static constexpr int NUM_CHANNELS = 2;
+static constexpr int SAMPLE_RATE = 44100;
+
 // #############################################################################
 //                           Defines
 // #############################################################################
 #define b8 char
-#define u8 unsigned char
 #define BIT(x) 1 << (x)
-#define KB(x) (x) * 1024
-#define MB(x) (x) * KB(x)
-#define GB(x) (x) * MB(x)
+#define KB(x) ((unsigned long long)1024 * x)
+#define MB(x) ((unsigned long long)1024 * KB(x))
+#define GB(x) ((unsigned long long)1024 * MB(x))
+
 #define ArraySize(x) (sizeof((x)) / sizeof((x)[0]))
 
 // #############################################################################
@@ -29,9 +39,6 @@
 #elif __APPLE__
 #define DEBUG_BREAK() __builtin_trap()
 #endif
-
-// render_interface.h
-constexpr int MAX_TRANSFORMS = 100;
 
 // #############################################################################
 //                           Logging
@@ -200,9 +207,88 @@ bool rect_collision(IRect a, IRect b)
 }
 
 // #############################################################################
+//                           Memeory Management
+// #############################################################################
+struct BumpAllocator
+{
+  size_t capacity;
+  size_t used;
+  char* memory;
+};
+
+BumpAllocator make_bump_allocator(size_t size)
+{
+  BumpAllocator result = {};
+
+  size_t alignedSize = (size + 7) & ~7;
+  result.capacity = alignedSize;
+  result.memory = (char*)malloc(alignedSize);
+
+  if(result.memory)
+  {
+    memset(result.memory, 0, alignedSize);
+  }
+  else
+  {
+    SM_ASSERT(0, "Failed to malloc memory: %d", size);
+  }
+
+  return result;
+}
+
+char* bump_alloc(BumpAllocator* allocator, size_t size)
+{
+  char* result = nullptr;
+
+  size_t alignedSize = (size + 7) & ~7;
+  if(allocator->used + alignedSize <= allocator->capacity)
+  {
+    result = allocator->memory + allocator->used;
+    allocator->used += alignedSize;
+  }
+  else
+  {
+    SM_ASSERT(0, "Bump allocator is full");
+  }
+
+  return result;
+}
+
+// #############################################################################
 //                           File I/O
 // #############################################################################
-char* read_file(char* filePath, int* fileSize)
+long long get_timestamp(char* file)
+{
+    struct stat file_stat = {};
+    stat(file, &file_stat);
+    return file_stat.st_mtime;
+}
+
+long get_file_size(char* filePath)
+{
+  SM_ASSERT(filePath, "No filePath supplied!");
+
+  long fileSize = 0;
+  auto file = fopen(filePath, "rb");
+  if(!file)
+  {
+    SM_ERROR("Failed opening File: %s", filePath);
+    return 0;
+  }
+
+  fseek(file, 0, SEEK_END);
+  fileSize = ftell(file);
+  fseek(file, 0, SEEK_SET);
+  fclose(file);
+
+  return fileSize;
+}
+/*
+* Reads a file into a supplied buffer. We manage our own
+* memory and therefore want more control over where it 
+* is allocated
+*/
+char* read_file(char* filePath, int* fileSize, char* buffer)
 {
   SM_ASSERT(filePath, "No filePath supplied!");
   SM_ASSERT(fileSize, "No fileSize supplied!");
@@ -219,28 +305,34 @@ char* read_file(char* filePath, int* fileSize)
   *fileSize = ftell(file);
   fseek(file, 0, SEEK_SET);
 
-  // TODO: Later we use our own memory allocator
-  char* fileBuffer = new char[*fileSize + 1];
-  fileBuffer[*fileSize] = 0; // Terminate the String
-
-  fread(fileBuffer, sizeof(char), *fileSize, file);
+  // Terminate the String
+  memset(buffer, 0, *fileSize + 1);
+  fread(buffer, sizeof(char), *fileSize, file);
 
   fclose(file);
 
-  return fileBuffer;
+  return buffer;
 }
 
-long long get_timestamp(char* file)
+char* read_file(char* filePath, int* fileSize, BumpAllocator* bumpAllocator)
 {
-    struct stat file_stat = {};
-    stat(file, &file_stat);
-    return file_stat.st_mtime;
+  char* file = 0;
+  long fileSize2 = get_file_size(filePath);
+
+  if(fileSize2)
+  {
+    char* buffer = bump_alloc(bumpAllocator, fileSize2 + 1);
+
+    file = read_file(filePath, fileSize, buffer);
+  }
+
+  return file; 
 }
 
-bool copy_file(char* fileName, char* outputName)
+bool copy_file(char* fileName, char* outputName, char* buffer)
 {
   int fileSize = 0;
-  char* data = read_file(fileName, &fileSize);
+  char* data = read_file(fileName, &fileSize, buffer);
 
   auto outputFile = fopen(outputName, "wb");
   if(!outputFile)
@@ -260,4 +352,65 @@ bool copy_file(char* fileName, char* outputName)
   free(data);
 
   return true;
+}
+
+// #############################################################################
+//                           WAV File stuff
+// #############################################################################
+// Wave Files are seperated into chunks, 
+// struct chunk
+// {
+//   unsigned int id;
+//   unsigned int size; // In bytes
+//   ...
+// }
+// we are ASSUMING!!!! That we have a "Riff Chunk"
+// followed by a "Format Chunk" followed by a
+// "Data Chunk", this CAN! be wrong ofcourse
+struct WAVHeader
+{
+  // Riff Chunk
+	unsigned int riffChunkId;
+	unsigned int riffChunkSize;
+	unsigned int format;
+
+  // Format Chunk
+	unsigned int formatChunkId;
+	unsigned int formatChunkSize;
+	unsigned short audioFormat;
+	unsigned short numChannels;
+	unsigned int sampleRate;
+	unsigned int byteRate;
+	unsigned short blockAlign;
+	unsigned short bitsPerSample;
+
+  // Data Chunk
+	unsigned char dataChunkId[4];
+	unsigned int dataChunkSize;
+};
+
+struct WAVFile
+{
+	WAVHeader header;
+	char dataBegin;
+};
+WAVFile* load_wav(char* path, BumpAllocator* bumpAllocator)
+{
+	int fileSize = 0;
+	WAVFile* wavFile = (WAVFile*)read_file(path, &fileSize, bumpAllocator);
+	if(!wavFile) 
+  { 
+    SM_ASSERT(0, "Failed to load Wave File: %s", path);
+    return {}; 
+  }
+
+	SM_ASSERT(wavFile->header.numChannels == NUM_CHANNELS, 
+            "We only support 2 channels for now!");
+	SM_ASSERT(wavFile->header.sampleRate == SAMPLE_RATE, 
+            "We only support 44100 sample rate for now!");
+
+	SM_ASSERT(memcmp(&wavFile->header.dataChunkId, "data", 4) == 0, 
+						"WAV File not in propper format");
+
+	return wavFile;
 }

@@ -23,7 +23,7 @@ static void APIENTRY gl_debug_callback(GLenum source, GLenum type, GLuint id, GL
   }
 }
 
-bool gl_init()
+bool gl_init(BumpAllocator* transientStorage)
 {
   load_gl_functions();
 
@@ -34,7 +34,7 @@ bool gl_init()
   int fragShaderID = glCreateShader(GL_FRAGMENT_SHADER);
 
   int fileSize = 0;
-  char* vertShaderSource = read_file("assets/shaders/quad.vert", &fileSize);
+  char* vertShaderSource = read_file("assets/shaders/quad.vert", &fileSize, transientStorage);
   if(!vertShaderSource)
   {
     SM_ASSERT(0, "Failed to load Shader: %s", "assets/shaders/quad.vert");
@@ -55,7 +55,7 @@ bool gl_init()
     }
   }
 
-  char* fragShaderSource = read_file("assets/shaders/quad.frag", &fileSize);
+  char* fragShaderSource = read_file("assets/shaders/quad.frag", &fileSize, transientStorage);
   if(!fragShaderSource)
   {
     SM_ASSERT(0, "Failed to load Shader: %s", "assets/shaders/quad.frag");

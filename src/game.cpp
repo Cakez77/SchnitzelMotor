@@ -20,18 +20,25 @@ IRect get_player_rect();
 // #############################################################################
 //                           Update Game (Exported from DLL)
 // #############################################################################
-EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* renderDataIn)
+EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, 
+                           RenderData* renderDataIn, SoundState* soundStateIn)
 {
   if(gameState != gameStateIn)
   {
     input = inputIn;
     renderData = renderDataIn;
     gameState = gameStateIn;
-
-    gameState->playerPos = {50, -100};
+    soundState = soundStateIn;
   }
 
-
+  if(!gameState->initialized)
+  {
+    gameState->initialized = true;
+    gameState->playerPos = {50, -100};
+    gameState->jumpSounds[0].path = "assets/sounds/jump_01.wav";
+    gameState->jumpSounds[1].path = "assets/sounds/jump_02.wav";
+    gameState->jumpSounds[2].path = "assets/sounds/jump_03.wav";
+  }
 
   update_game_input();
 
@@ -55,6 +62,7 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
   static float wallJumpTimer = 0.0f;
   static bool playerGrounded = true;
   static bool grabbingWall = false;
+  static int soundIdx = 0;
 
   static IRect solids [] =
   {
@@ -129,6 +137,11 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
   {
     if(just_pressed(INPUT_JUMP) && playerGrounded)
     {
+      play_sound(gameState->jumpSounds[soundIdx++]);
+      if(soundIdx > 2)
+      {
+        soundIdx = 0;
+      }
       varJumpTimer = 0.0f;
       speed.y = maxJumpSpeed;
       playerGrounded = false;
@@ -175,6 +188,12 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* r
             varJumpTimer = 0.0f;
             speed.x = -wallJumpSpeed;
             speed.y = maxJumpSpeed;
+          }
+
+          play_sound(gameState->jumpSounds[soundIdx++]);
+          if(soundIdx > 2)
+          {
+            soundIdx = 0;
           }
         }
       }

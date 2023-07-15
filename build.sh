@@ -9,7 +9,7 @@ if [[ "$(uname)" == "Linux" ]]; then
     includes="-Ithird_party"
     outputFile=schnitzel
     queryProcesses=$(pgrep $outputFile)
-    # fPIC position independent code 
+    # fPIC position independent code
     clang++ -g "src/game.cpp" -shared -fPIC -o game_$timestamp.so $warnings
     mv game_$timestamp.so game.so
 
@@ -24,7 +24,7 @@ elif [[ "$(uname)" == "Darwin" ]]; then
     rm -f src/*.o
 else
     echo "Not running on Linux"
-    libs="-luser32 -lgdi32 -lopengl32"
+    libs="-luser32 -lgdi32 -lopengl32 -lole32"
     includes="-Ithird_party"
     outputFile=schnitzel.exe
     queryProcesses=$(tasklist | grep $outputFile)

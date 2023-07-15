@@ -72,12 +72,13 @@ enum KeyCodes
   KEY_COUNT = 256,
 };
 
+// 32 Bits, 16 Bit aligned
 struct Key
 {
   b8 isDown;
   b8 justPressed;
   b8 justReleased;
-  u8 halfTransitionCount;
+  unsigned char halfTransitionCount;
 };
 
 struct Input

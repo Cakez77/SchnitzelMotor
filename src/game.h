@@ -2,6 +2,7 @@
 #include "schnitzel_lib.h"
 #include "input.h"
 #include "render_interface.h"
+#include "sound.h"
 
 enum GameInputType
 {
@@ -24,12 +25,15 @@ struct GameInput
 struct GameState
 {
   IVec2 playerPos;
+  b8 initialized = false;
   GameInput gameInput[GAME_INPUT_COUNT];
+  Sound jumpSounds[3];
 };
 
 extern "C"
 {
-  EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* renderDataIn);
+  EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* renderDataIn,
+                             SoundState* soundStateIn);
 }
 
 

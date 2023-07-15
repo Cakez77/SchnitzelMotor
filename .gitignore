@@ -23,3 +23,5 @@ build
 *.xcuserstate
 *.xcworkspace
 *.xcodeproj/
+generate_ctags.bat
+.tags
