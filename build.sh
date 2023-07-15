@@ -17,7 +17,7 @@ elif [[ "$(uname)" == "Darwin" ]]; then
     echo "Running on Mac"
     libs="-framework Cocoa"
     sdkpath=$(xcode-select --print-path)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
-    cflags="-isysroot ${sdkpath} -I${sdkpath}/System/Library/Frameworks/Cocoa.framework/Headers"
+    includes="-Ithird_party -isysroot ${sdkpath} -I${sdkpath}/System/Library/Frameworks/Cocoa.framework/Headers"
     objc_dep="src/mac_platform.m"
     outputFile=schnitzel
     # clean up old object files
@@ -38,7 +38,7 @@ processRunning=$queryProcesses
 
 if [ -z "$processRunning" ]; then
     echo "Engine not running, building main..."
-    clang++ $includes $cflags -g "src/main.cpp" $objc_dep -o $outputFile $libs $warnings
+    clang++ $includes -g "src/main.cpp" $objc_dep -o $outputFile $libs $warnings
 else
     echo "Engine running, not building!"
 fi
