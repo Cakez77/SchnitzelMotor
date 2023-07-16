@@ -1,3 +1,6 @@
+// Including this, because VSCODE = DOGSHIT!
+#include "schnitzel_lib.h"
+#include "sound.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -40,6 +43,8 @@ struct xAudioVoice : IXAudio2VoiceCallback
 // #############################################################################
 static HWND window;
 static HDC dc;
+static PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT_ptr;
+static PFNWGLGETSWAPINTERVALEXTPROC wglGetSwapIntervalEXT_ptr;
 static PFNGLDEBUGMESSAGECALLBACKPROC glDebugMessageCallback_ptr;
 static xAudioVoice voiceArr[MAX_CONCURRENT_SOUNDS];
 
@@ -307,6 +312,8 @@ bool platform_create_window(int width, int height, char* title)
     wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC)platform_load_gl_func("wglChoosePixelFormatARB");
     wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)platform_load_gl_func("wglCreateContextAttribsARB");
     glDebugMessageCallback_ptr = (PFNGLDEBUGMESSAGECALLBACKPROC)platform_load_gl_func("glDebugMessageCallback");
+    wglSwapIntervalEXT_ptr = (PFNWGLSWAPINTERVALEXTPROC)platform_load_gl_func("wglSwapIntervalEXT");
+    wglGetSwapIntervalEXT_ptr = (PFNWGLGETSWAPINTERVALEXTPROC)platform_load_gl_func("wglGetSwapIntervalEXT");
 
     // Clean up the fake stuff
     wglMakeCurrent(fakeDC, 0);
@@ -438,6 +445,11 @@ void* platform_load_gl_func(char* funName)
 void platform_swap_buffers()
 {
   SwapBuffers(dc);
+}
+
+void platform_set_vsync(bool vSync)
+{
+  wglSwapIntervalEXT_ptr(vSync);
 }
 
 void glDebugMessageCallback (GLDEBUGPROC callback, const void *userParam)

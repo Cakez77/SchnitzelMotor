@@ -27,7 +27,8 @@ struct GameState
   IVec2 playerPos;
   b8 initialized = false;
   GameInput gameInput[GAME_INPUT_COUNT];
-  Sound jumpSounds[3];
+  Sound jumpSound;
+  Sound deathSound;
 };
 
 extern "C"

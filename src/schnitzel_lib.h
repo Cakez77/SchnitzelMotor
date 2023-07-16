@@ -165,9 +165,39 @@ struct Vec2
   float y;
 };
 
+Vec2 operator+(Vec2 a, Vec2 b)
+{
+  return Vec2{a.x + b.x, a.y + b.y};
+}
+
 Vec2 operator*(Vec2 a, float scalar)
 {
   return Vec2{a.x * scalar, a.y * scalar};
+}
+
+Vec2 operator*(Vec2 a, Vec2 b)
+{
+  return Vec2{a.x * b.x, a.y * b.y};
+}
+
+Vec2 operator-(Vec2 a)
+{
+  return Vec2{-a.x, -a.y};
+}
+
+Vec2 operator-(Vec2 a, Vec2 b)
+{
+  return Vec2{a.x - b.x, a.y - b.y};
+}
+
+bool operator==(Vec2 a, Vec2 b)
+{
+  return a.x == b.x && a.y == b.y;
+}
+
+bool operator!=(Vec2 a, Vec2 b)
+{
+  return !(a == b);
 }
 
 struct IVec2
@@ -176,14 +206,34 @@ struct IVec2
   int y;
 };
 
+IVec2 operator-(IVec2 a, IVec2 b)
+{
+  return IVec2{a.x - b.x, a.y - b.y};
+}
+
+IVec2 operator+(IVec2 a, IVec2 b)
+{
+  return IVec2{a.x + b.x, a.y + b.y};
+}
+
 IVec2 operator+(IVec2 a, int scalar)
 {
   return IVec2{a.x + scalar, a.y + scalar};
 }
 
+IVec2 operator*(IVec2 a, float scalar)
+{
+  return IVec2{(int)((float)a.x * scalar), (int)((float)a.y * scalar)};
+}
+
 Vec2 vec_2(IVec2 ivec2)
 {
   return Vec2{(float)ivec2.x, (float)ivec2.y};
+}
+
+IVec2 ivec_2(Vec2 ivec2)
+{
+  return IVec2{(int)ivec2.x, (int)ivec2.y};
 }
 
 struct Rect

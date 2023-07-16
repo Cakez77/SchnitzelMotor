@@ -40,6 +40,7 @@ bool platform_create_window(int width, int height, char* title);
 void platform_update_window();
 void* platform_load_gl_func(char* funName);
 void platform_swap_buffers();
+void platform_set_vsync(bool vSync);
 void platform_reaload_dynamic_library();
 bool platform_init_audio();
 void platform_update_audio(float dt);
@@ -99,6 +100,8 @@ int main()
     SM_ERROR("Failed to initialize Audio");
     return -1;
   }
+
+  platform_set_vsync(true);
 
   while(running)
   {
