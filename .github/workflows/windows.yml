@@ -1,0 +1,11 @@
+name: windows
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - name: checkout
+      uses: actions/checkout@v3
+    - name: build
+      run: bash build.sh

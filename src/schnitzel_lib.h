@@ -35,9 +35,10 @@ static constexpr int SAMPLE_RATE = 44100;
 #define EXPORT_FN __declspec(dllexport)
 #elif __linux__
 #define DEBUG_BREAK() __asm__ volatile ("int3")
-#define EXPORT_FN 
+#define EXPORT_FN
 #elif __APPLE__
 #define DEBUG_BREAK() __builtin_trap()
+#define EXPORT_FN
 #endif
 
 // #############################################################################
