@@ -1,3 +1,6 @@
+// THESE ARE NOT NEEDED, VSCODE IS DOOOOOOOOOOGGGG SHIT
+#include "input.h"
+#include "schnitzel_lib.h"
 
 #include <X11/Xlib.h>
 #include <GL/glx.h>
@@ -13,6 +16,7 @@
 //                           Linux Globals
 // #############################################################################
 extern bool running;  // <- declare, but do not define
+static PFNGLXSWAPINTERVALEXTPROC glXSwapIntervalEXT_ptr;
 static Display* display;
 static Atom wmDeleteWindow;
 static Window window;
@@ -195,6 +199,7 @@ bool platform_create_window(int width, int height, char* title)
 
   PFNGLXCREATECONTEXTATTRIBSARBPROC glXCreateContextAttribsARB =
     (PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB");
+  glXSwapIntervalEXT_ptr = (PFNGLXSWAPINTERVALEXTPROC)glXGetProcAddress((const GLubyte*)"glXSwapIntervalEXT");
 
   // Set desired minimum OpenGL version
   int contextAttribs[] = 
@@ -207,7 +212,7 @@ bool platform_create_window(int width, int height, char* title)
   };
 
   // Create modern OpenGL context
-  GLXContext ctx = glXCreateContextAttribsARB(display, fbc[0], NULL, true, contextAttribs);
+  GLXContext rc = glXCreateContextAttribsARB(display, fbc[0], NULL, true, contextAttribs);
 
   // Set the input mask for our window on the current display
   // ExposureMask | KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask | 
@@ -216,7 +221,7 @@ bool platform_create_window(int width, int height, char* title)
   XSelectInput(display, window, event_mask);
 
   XMapWindow(display, window);
-  glXMakeCurrent(display, window, ctx);
+  glXMakeCurrent(display, window, rc);
 
   // Tell the server to notify us when the window manager attempts to destroy the window
   wmDeleteWindow = XInternAtom(display, "WM_DELETE_WINDOW", False);
@@ -290,6 +295,11 @@ void platform_swap_buffers()
   glXSwapBuffers(display, window);
 }
 
+void platform_set_vsync(bool vSync)
+{
+  glXSwapIntervalEXT_ptr(display, window, vSync);
+}
+
 void platform_reaload_dynamic_library()
 {
   static void* gameDLL;
@@ -306,7 +316,7 @@ void platform_reaload_dynamic_library()
       SM_TRACE("Freed game.so");
     }
 
-    while(!copy_file("game.so", "game_load.so"))
+    while(!copy_file("game.so", "game_load.so", &transientStorage))
     {
       sleep(10);
     }
@@ -325,3 +335,18 @@ void platform_reaload_dynamic_library()
     lastTimestampGameDLL = currentTimestampGameDLL;
   }
 }
+
+bool platform_init_audio()
+{
+  // TODO: Linux Audio monakS
+  return true;
+}
+
+void platform_update_audio(float dt)
+{
+  // TODO: Please I don't want to do this!!!!!
+  soundState->playingSounds.clear();
+}
+
+
+

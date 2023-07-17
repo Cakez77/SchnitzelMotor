@@ -34,7 +34,7 @@ static constexpr int SAMPLE_RATE = 44100;
 #define DEBUG_BREAK() __debugbreak()
 #define EXPORT_FN __declspec(dllexport)
 #elif __linux__
-#define DEBUG_BREAK() __asm__ volatile ("int3")
+#define DEBUG_BREAK() __builtin_debugtrap()
 #define EXPORT_FN
 #elif __APPLE__
 #define DEBUG_BREAK() __builtin_trap()
@@ -106,7 +106,7 @@ struct Array
 
   int add(T element)
   {
-    SM_ASSERT(count < maxElements, "Array Full!");
+     SM_ASSERT(count < maxElements, "Array Full!");
     elements[count] = element;
     return count++;
   }
@@ -334,6 +334,7 @@ long get_file_size(char* filePath)
 
   return fileSize;
 }
+
 /*
 * Reads a file into a supplied buffer. We manage our own
 * memory and therefore want more control over where it 
@@ -400,9 +401,23 @@ bool copy_file(char* fileName, char* outputName, char* buffer)
   }
   
   fclose(outputFile);
-  free(data);
 
   return true;
+}
+
+bool copy_file(char* fileName, char* outputName, BumpAllocator* bumpAllocator)
+{
+  char* file = 0;
+  long fileSize2 = get_file_size(fileName);
+
+  if(fileSize2)
+  {
+    char* buffer = bump_alloc(bumpAllocator, fileSize2 + 1);
+
+    return copy_file(fileName, outputName, buffer);
+  }
+
+  return false;
 }
 
 // #############################################################################

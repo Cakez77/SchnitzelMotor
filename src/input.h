@@ -1,6 +1,8 @@
 #pragma once
 #include "schnitzel_lib.h"
 
+constexpr int MAX_KEYCODES = 256;
+
 enum KeyCodes
 {
   KEY_LEFT_MOUSE,
@@ -69,7 +71,7 @@ enum KeyCodes
   KEY_NUMPAD_DOT,
   KEY_NUMPAD_SLASH,
   
-  KEY_COUNT = 256,
+  KEY_COUNT = MAX_KEYCODES,
 };
 
 // 32 Bits, 16 Bit aligned
@@ -85,7 +87,7 @@ struct Input
 {
   Vec2 screenSize;
 
-  Key keys[KEY_COUNT];
+  Key keys[MAX_KEYCODES];
 };
 
 static Input* input;

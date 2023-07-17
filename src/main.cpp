@@ -20,7 +20,6 @@ typedef decltype(update_game) update_game_type;
 // #############################################################################
 constexpr int TRANSIENT_STORAGE_SIZE = MB(128);
 constexpr int PERSISTENT_STORAGE_SIZE = MB(256);
-constexpr int MAX_KEYCODES = 256;
 
 // #############################################################################
 //                           Platform Globals
