@@ -4,6 +4,9 @@
 #include "render_interface.h"
 #include "sound.h"
 
+static constexpr int UPDATES_PER_SECOND = 60;
+static constexpr double UPDATE_DELAY = 1.0 / UPDATES_PER_SECOND;
+
 enum GameInputType
 {
   INPUT_MOVE_LEFT,
@@ -24,7 +27,9 @@ struct GameInput
 
 struct GameState
 {
+  double updateTimer;
   IVec2 playerPos;
+  IVec2 prevPlayerPos;
   b8 initialized = false;
   GameInput gameInput[GAME_INPUT_COUNT];
   Sound jumpSound;
@@ -34,7 +39,7 @@ struct GameState
 extern "C"
 {
   EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* renderDataIn,
-                             SoundState* soundStateIn);
+                             SoundState* soundStateIn, double frameTime);
 }
 
 

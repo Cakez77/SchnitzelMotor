@@ -290,7 +290,7 @@ void platform_swap_buffers()
   glXSwapBuffers(display, window);
 }
 
-void platform_reaload_dynamic_library()
+void platform_reload_dynamic_library()
 {
   static void* gameDLL;
   static long long lastTimestampGameDLL;

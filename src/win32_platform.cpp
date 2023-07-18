@@ -1,7 +1,3 @@
-// Including this, because VSCODE = DOGSHIT!
-#include "schnitzel_lib.h"
-#include "sound.h"
-
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
@@ -457,7 +453,7 @@ void glDebugMessageCallback (GLDEBUGPROC callback, const void *userParam)
   glDebugMessageCallback_ptr(callback, userParam);
 }
 
-void platform_reaload_dynamic_library()
+void platform_reload_dynamic_library()
 {
   static HMODULE gameDLL;
   static long long lastTimestampGameDLL;

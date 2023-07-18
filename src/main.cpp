@@ -9,6 +9,7 @@
 #define GL_GLEXT_PROTOTYPES // This is so we get the function declarations
 #include "glcorearb.h"
 
+
 // #############################################################################
 //                           Platform defines
 // #############################################################################
@@ -20,7 +21,6 @@ typedef decltype(update_game) update_game_type;
 // #############################################################################
 constexpr int TRANSIENT_STORAGE_SIZE = MB(128);
 constexpr int PERSISTENT_STORAGE_SIZE = MB(256);
-constexpr int MAX_KEYCODES = 256;
 
 // #############################################################################
 //                           Platform Globals
@@ -41,7 +41,7 @@ void platform_update_window();
 void* platform_load_gl_func(char* funName);
 void platform_swap_buffers();
 void platform_set_vsync(bool vSync);
-void platform_reaload_dynamic_library();
+void platform_reload_dynamic_library();
 bool platform_init_audio();
 void platform_update_audio(float dt);
 
@@ -61,8 +61,20 @@ void platform_update_audio(float dt);
 // #############################################################################
 #include "gl_renderer.cpp"
 
+// #############################################################################
+//                           Cross Platform STD
+// #############################################################################
+// Used to get Delta Time
+#include <chrono>
+
+double get_delta_time();
+
+
 int main()
 {
+  // Init lastTime
+  get_delta_time();
+
   transientStorage = make_bump_allocator(TRANSIENT_STORAGE_SIZE);
   persistentStorage = make_bump_allocator(PERSISTENT_STORAGE_SIZE);
 
@@ -101,30 +113,24 @@ int main()
     return -1;
   }
 
-  platform_set_vsync(true);
+  platform_set_vsync(false);
 
   while(running)
   {
+    // In seconds
+    double dt = get_delta_time();
+
     // Resent transient Storage
     transientStorage.used = 0;
 
     // Load the update_game function pointer from the DLL
-    platform_reaload_dynamic_library();
-
-    // Reset Input
-    for(int keyIdx = 0; keyIdx < MAX_KEYCODES; keyIdx++)
-    {
-      input->keys[keyIdx].justReleased = false;
-      input->keys[keyIdx].justPressed = false;
-      input->keys[keyIdx].halfTransitionCount = 0;
-    }
-
+    platform_reload_dynamic_library();
     platform_update_window();
-    update_game(gameState, input, renderData, soundState);
+    update_game(gameState, input, renderData, soundState, dt);
     gl_render();
 
     // This is platform specific!
-    platform_update_audio(1.0f/60.0f);
+    platform_update_audio(dt);
     platform_swap_buffers();
   }
 
@@ -132,7 +138,24 @@ int main()
 }
 
 void update_game(GameState* gameState, Input* inputIn, 
-                 RenderData* renderDataIn, SoundState* soundStateIn)
+                 RenderData* renderDataIn, SoundState* soundStateIn,
+                 double dt)
 {
-  update_game_ptr(gameState, inputIn, renderDataIn, soundStateIn);
+  update_game_ptr(gameState, inputIn, renderDataIn, soundStateIn, dt);
+}
+
+// #############################################################################
+//                           Cross Platform STD 
+// #############################################################################
+double get_delta_time()
+{
+  // Only executed once when entering the function (static)
+  static auto lastTime = std::chrono::steady_clock::now();
+  auto currentTime = std::chrono::steady_clock::now();
+
+  // seconds
+  double delta = std::chrono::duration<double>(currentTime - lastTime).count(); 
+  lastTime = currentTime; 
+
+  return delta;
 }

@@ -27,9 +27,6 @@ static constexpr int SAMPLE_RATE = 44100;
 
 #define ArraySize(x) (sizeof((x)) / sizeof((x)[0]))
 
-// #############################################################################
-//                           Defines
-// #############################################################################
 #ifdef _WIN32
 #define DEBUG_BREAK() __debugbreak()
 #define EXPORT_FN __declspec(dllexport)
@@ -235,6 +232,27 @@ Vec2 vec_2(IVec2 ivec2)
 IVec2 ivec_2(Vec2 ivec2)
 {
   return IVec2{(int)ivec2.x, (int)ivec2.y};
+}
+
+float lerp(float a, float b, float t)
+{
+  return a + (b - a) * t;
+}
+
+Vec2 lerp(Vec2 a, Vec2 b, float t)
+{
+  Vec2 result;
+  result.x = lerp(a.x, b.x, t);
+  result.y = lerp(a.y, b.y, t);
+  return result;
+}
+
+IVec2 lerp(IVec2 a, IVec2 b, float t)
+{
+  IVec2 result;
+  result.x = (int)floorf(lerp((float)a.x, (float)b.x, t));
+  result.y = (int)floorf(lerp((float)a.y, (float)b.y, t));
+  return result;
 }
 
 struct Rect

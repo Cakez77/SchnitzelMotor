@@ -4,9 +4,66 @@
 #include "render_interface.h"
 
 // #############################################################################
+//                           Game Structs
+// #############################################################################
+  struct Keyframe
+  {
+    IVec2 pos;
+    float time; // how long to get there
+  };
+
+  struct Solid
+  {
+    // Pixel Movement
+    float remainderX;
+    float remainderY;
+
+    // Used by "interpolated rendering"
+    IVec2 prevPos;
+    // Current pos & size
+    IRect rect;
+
+    int keyframeIdx;
+    Array<Keyframe, 10> keyframes;
+
+    // Animation
+    float time;
+    float waitingTime;
+    float waitingDuration;
+  };
+
+// #############################################################################
 //                           Game Globals
 // #############################################################################
 static GameState* gameState;
+
+static Solid solids [] =
+{
+  {
+    .rect = {48 * 13, 48 * 2, 48, 48 * 8},
+  },
+  {
+    .rect = {48 *  8, 48 * 2, 48, 48 * 8}
+  },
+  {
+    .rect = {0, 624, 1048, 48}
+  },
+  {
+    .rect = {48 * 5, 48 * 12, 48 * 2, 48},
+    .keyframes = 
+    {
+      .count = 5,
+      .elements =
+      {
+        {{48 * 0, 48 * 12}, 0.0f},
+        {{48 * 5, 48 * 12}, 1.0f},
+        {{48 * 5, 48 * 3}, 2.0f},
+        {{48 * 5, 48 * 12}, 3.0f},
+        {{48 * 0, 48 * 12}, 4.0f},
+      }
+    }
+  },
+};
 
 // #############################################################################
 //                           Game Functions
@@ -16,12 +73,15 @@ bool just_pressed(GameInputType type);
 void update_game_input();
 void move_x();
 IRect get_player_rect();
+void draw(float interpolatedDT);
+void update();
 
 // #############################################################################
 //                           Update Game (Exported from DLL)
 // #############################################################################
 EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, 
-                           RenderData* renderDataIn, SoundState* soundStateIn)
+                           RenderData* renderDataIn, SoundState* soundStateIn,
+                           double frameTime)
 {
   if(gameState != gameStateIn)
   {
@@ -39,10 +99,102 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
     gameState->deathSound.path = "assets/sounds/died_01.wav";
   }
 
-  update_game_input();
+  gameState->updateTimer += frameTime;
+  while(gameState->updateTimer >= UPDATE_DELAY)
+  {
+    gameState->updateTimer -= UPDATE_DELAY;
+    update();
 
-  // This is inside of the data section of the memory, int the exe
-  float dt = 1.0f / 60.0f;
+    // Reset Input
+    for(int keyIdx = 0; keyIdx < MAX_KEYCODES; keyIdx++)
+    {
+      input->keys[keyIdx].justReleased = false;
+      input->keys[keyIdx].justPressed = false;
+      input->keys[keyIdx].halfTransitionCount = 0;
+    }
+  }
+  float interp_dt = (float)(gameState->updateTimer / UPDATE_DELAY);
+  draw(interp_dt);
+}
+
+// #############################################################################
+//                           Implementations
+// #############################################################################
+bool is_down(GameInputType type)
+{
+  return gameState->gameInput[type].isDown;
+}
+
+bool just_pressed(GameInputType type)
+{
+  return gameState->gameInput[type].justPressed;
+}
+
+void update_game_input()
+{
+  // Moving
+  gameState->gameInput[INPUT_MOVE_LEFT].isDown = input->keys[KEY_A].isDown;
+  gameState->gameInput[INPUT_MOVE_RIGHT].isDown = input->keys[KEY_D].isDown;
+  gameState->gameInput[INPUT_MOVE_UP].isDown = input->keys[KEY_W].isDown;
+  gameState->gameInput[INPUT_MOVE_DOWN].isDown = input->keys[KEY_S].isDown;
+  gameState->gameInput[INPUT_MOVE_LEFT].isDown |= input->keys[KEY_LEFT].isDown;
+  gameState->gameInput[INPUT_MOVE_RIGHT].isDown |= input->keys[KEY_RIGHT].isDown;
+  gameState->gameInput[INPUT_MOVE_UP].isDown |= input->keys[KEY_UP].isDown;
+  gameState->gameInput[INPUT_MOVE_DOWN].isDown |= input->keys[KEY_DOWN].isDown;
+
+  // Jumping
+  gameState->gameInput[INPUT_JUMP].justPressed = 
+    input->keys[KEY_SPACE].justPressed;
+  gameState->gameInput[INPUT_JUMP].isDown = 
+    input->keys[KEY_SPACE].isDown;
+
+  // Wall Grabbing
+  gameState->gameInput[INPUT_WALL_GRAB].isDown =
+    input->keys[KEY_E].isDown;
+  gameState->gameInput[INPUT_WALL_GRAB].isDown |=
+    input->keys[KEY_Q].isDown;
+}
+
+void move_x(float amount) 
+{
+}
+
+IRect get_player_rect()
+{
+  return 
+  {
+    gameState->playerPos.x + 6 * 6, 
+    gameState->playerPos.y + 2 * 6, 
+    9 * 6, 
+    16 * 6
+  };
+}
+
+void draw(float interpDT)
+{
+  for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
+  {
+    Solid solid = solids[solidIdx];
+    IVec2 solidPos = lerp(solid.prevPos, solid.rect.pos, interpDT);
+    draw_quad(solidPos, solid.rect.size);
+  }
+
+  IRect playerRect = get_player_rect();
+  IVec2 playerPos = lerp(gameState->prevPlayerPos, gameState->playerPos, interpDT);
+  draw_quad(playerRect.pos, playerRect.size);
+  draw_sprite(SPRITE_CELESTE_01, vec_2(gameState->playerPos));
+}
+
+void update()
+{
+  update_game_input();
+  gameState->prevPlayerPos = gameState->playerPos;
+
+  // We update the logic at a fixed rate to keep the game stable 
+  // and to save on performance
+  float dt = UPDATE_DELAY;
+
+  // Movement Data needed for Celeste
   float maxRunSpeed = 10.0f;
   float wallJumpSpeed = 15.0f;
   float runAcceleration = 50.0f;
@@ -62,67 +214,10 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
   static bool playerGrounded = true;
   static bool grabbingWall = false;
 
-  struct Keyframe
-  {
-    IVec2 pos;
-    float time; // how long to get there
-  };
-
-  struct Solid
-  {
-    // Pixel Movement
-    float remainderX;
-    float remainderY;
-
-    // Current pos & size
-    IRect rect;
-
-    int keyframeIdx;
-    Array<Keyframe, 10> keyframes;
-
-    // Animation
-    float time;
-    float waitingTime;
-    float waitingDuration;
-  };
-
-  static Solid solids [] =
-  {
-    // {48 * 2, 48, 48 * 8, 48},
-    // {624, 96, 480, 48},
-    {
-      .rect = {48 * 13, 48 * 2, 48, 48 * 8},
-    },
-    {
-      .rect = {48 *  8, 48 * 2, 48, 48 * 8}
-    },
-    {
-      .rect = {0, 624, 1048, 48}
-    },
-    // {1048 + 240, 624, 1048, 48},
-    // {1040 - 240, 96 * 4, 480, 48},
-    // {48 * 3, 48 * 10, 48 * 3, 48},
-    {
-      .rect = {48 * 5, 48 * 7, 48 * 2, 48},
-      .keyframes = 
-      {
-        .count = 5,
-        .elements =
-        {
-          {{48 * 0, 48 * 7}, 0.0f},
-          {{48 * 5, 48 * 7}, 1.0f},
-          {{48 * 5, 48 * 3}, 2.0f},
-          {{48 * 5, 48 * 7}, 3.0f},
-          {{48 * 0, 48 * 7}, 4.0f},
-        }
-      }
-    },
-    // {48 * 9, 48 * 5, 48 * 3, 48},
-  };
-
   for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
   {
     Solid* solid = &solids[solidIdx];
+    solid->prevPos = solid->rect.pos;
 
     if(solid->keyframes.count > 1)
     {
@@ -180,12 +275,23 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
             playerRect.pos.y -= 2;
             playerRect.size.y += 4;
 
-            // Is the player currently standing on this Solid
+            // Is Celeste currently standing on this Solid,
+            // or is she getting pushed
             if(rect_collision(playerRect, newSolidRect))
             {
               if(solidRect.pos.y <= playerRect.pos.y + playerRect.size.y)
               {
                 gameState->playerPos.x += moveSign;
+              }
+                
+              for(int subSolidIdx = 0; subSolidIdx < ArraySize(solids);
+                  subSolidIdx++)
+              {
+                IRect subSolidRect = solids[subSolidIdx].rect;
+                if(rect_collision(get_player_rect(), subSolidRect))
+                {
+                  gameState->playerPos = {50, 0};
+                }
               }
             }
 
@@ -222,7 +328,18 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
               {
                 gameState->playerPos.y += moveSign;
               }
+
+              for(int subSolidIdx = 0; subSolidIdx < ArraySize(solids);
+                  subSolidIdx++)
+              {
+                IRect subSolidRect = solids[subSolidIdx].rect;
+                if(rect_collision(get_player_rect(), subSolidRect))
+                {
+                  gameState->playerPos = {50, 0};
+                }
+              }
             }
+
 
             solid->rect.pos.y += moveSign; 
             move -= moveSign; 
@@ -230,8 +347,6 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
         } 
       }
     }
-
-    draw_quad(solids[solidIdx].rect.pos, solids[solidIdx].rect.size);
   }
 
   if(key_pressed_this_frame(KEY_R))
@@ -277,7 +392,7 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
     }
   }
 
-  // firction
+  // friction
   if(!is_down(INPUT_MOVE_LEFT) &&
      !is_down(INPUT_MOVE_RIGHT))
   {
@@ -414,7 +529,7 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
       speed.y = approach(speed.y, wallSlideDownSpeed, runAcceleration * mult * dt);
     }
 
-    // firction
+    // friction
     if(grabbingWall &&
       !is_down(INPUT_MOVE_UP) &&
       !is_down(INPUT_MOVE_DOWN))
@@ -512,62 +627,4 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
       } 
     } 
   }
-
-  IRect playerRect = get_player_rect();
-  draw_quad(playerRect.pos, playerRect.size);
-  draw_sprite(SPRITE_CELESTE_01, vec_2(gameState->playerPos));
-  // draw_quad(gameState.playerPos, {50.0f, 50.0f});
-}
-
-// #############################################################################
-//                           Implementations
-// #############################################################################
-bool is_down(GameInputType type)
-{
-  return gameState->gameInput[type].isDown;
-}
-
-bool just_pressed(GameInputType type)
-{
-  return gameState->gameInput[type].justPressed;
-}
-
-void update_game_input()
-{
-  // Moving
-  gameState->gameInput[INPUT_MOVE_LEFT].isDown = input->keys[KEY_A].isDown;
-  gameState->gameInput[INPUT_MOVE_RIGHT].isDown = input->keys[KEY_D].isDown;
-  gameState->gameInput[INPUT_MOVE_UP].isDown = input->keys[KEY_W].isDown;
-  gameState->gameInput[INPUT_MOVE_DOWN].isDown = input->keys[KEY_S].isDown;
-  gameState->gameInput[INPUT_MOVE_LEFT].isDown |= input->keys[KEY_LEFT].isDown;
-  gameState->gameInput[INPUT_MOVE_RIGHT].isDown |= input->keys[KEY_RIGHT].isDown;
-  gameState->gameInput[INPUT_MOVE_UP].isDown |= input->keys[KEY_UP].isDown;
-  gameState->gameInput[INPUT_MOVE_DOWN].isDown |= input->keys[KEY_DOWN].isDown;
-
-  // Jumping
-  gameState->gameInput[INPUT_JUMP].justPressed = 
-    input->keys[KEY_SPACE].justPressed;
-  gameState->gameInput[INPUT_JUMP].isDown = 
-    input->keys[KEY_SPACE].isDown;
-
-  // Wall Grabbing
-  gameState->gameInput[INPUT_WALL_GRAB].isDown =
-    input->keys[KEY_E].isDown;
-  gameState->gameInput[INPUT_WALL_GRAB].isDown |=
-    input->keys[KEY_Q].isDown;
-}
-
-void move_x(float amount) 
-{
-}
-
-IRect get_player_rect()
-{
-  return 
-  {
-    gameState->playerPos.x + 30, 
-    gameState->playerPos.y + 12, 
-    9 * 6, 
-    16 * 6
-  };
 }
