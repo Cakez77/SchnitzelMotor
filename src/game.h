@@ -4,9 +4,16 @@
 #include "render_interface.h"
 #include "sound.h"
 
-static constexpr int UPDATES_PER_SECOND = 60;
-static constexpr double UPDATE_DELAY = 1.0 / UPDATES_PER_SECOND;
+// #############################################################################
+//                           Game Constants
+// #############################################################################
+constexpr int UPDATES_PER_SECOND = 60;
+constexpr double UPDATE_DELAY = 1.0 / UPDATES_PER_SECOND;
+constexpr IVec2 WORLD_SIZE = {330, 170};
 
+// #############################################################################
+//                           Game Structs
+// #############################################################################
 enum GameInputType
 {
   INPUT_MOVE_LEFT,

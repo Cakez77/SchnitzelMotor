@@ -15,8 +15,8 @@
   struct Solid
   {
     // Pixel Movement
-    float remainderX;
-    float remainderY;
+    Vec2 prevRemainder;
+    Vec2 remainder;
 
     // Used by "interpolated rendering"
     IVec2 prevPos;
@@ -35,31 +35,36 @@
 // #############################################################################
 //                           Game Globals
 // #############################################################################
+static int worldScale = 5;
 static GameState* gameState;
+static Vec2 prevRemainder = {};
+static float xRemainder = 0.0f;
+static float yRemainder = 0.0f;
+static bool standingOnPlatofrm = false;
 
 static Solid solids [] =
 {
   {
-    .rect = {48 * 13, 48 * 2, 48, 48 * 8},
+    // .rect = {48 * 13, 48 * 2, 48, 48 * 8},
   },
   {
-    .rect = {48 *  8, 48 * 2, 48, 48 * 8}
+    // .rect = {48 *  8, 48 * 2, 48, 48 * 8}
   },
   {
-    .rect = {0, 624, 1048, 48}
+    .rect = {0, 8 * 13, 8 * 22, 8}
   },
   {
-    .rect = {48 * 5, 48 * 12, 48 * 2, 48},
+    .rect = {8 * 5, 8 * 12, 8 * 2, 8},
     .keyframes = 
     {
       .count = 5,
       .elements =
       {
-        {{48 * 0, 48 * 12}, 0.0f},
-        {{48 * 5, 48 * 12}, 1.0f},
-        {{48 * 5, 48 * 3}, 2.0f},
-        {{48 * 5, 48 * 12}, 3.0f},
-        {{48 * 0, 48 * 12}, 4.0f},
+        {{8 * 0, 8 * 12}, 0.0f},
+        {{8 * 8, 8 * 12}, 0.5f},
+        {{8 * 5, 8 *  7}, 1.0f},
+        {{8 * 8, 8 * 12}, 1.5f},
+        {{8 * 0, 8 * 12}, 2.0f},
       }
     }
   },
@@ -89,14 +94,15 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
     renderData = renderDataIn;
     gameState = gameStateIn;
     soundState = soundStateIn;
+
+    gameState->jumpSound.path = "assets/sounds/jump_01.wav";
+    gameState->deathSound.path = "assets/sounds/died_01.wav";
   }
 
   if(!gameState->initialized)
   {
     gameState->initialized = true;
-    gameState->playerPos = {50, -100};
-    gameState->jumpSound.path = "assets/sounds/jump_01.wav";
-    gameState->deathSound.path = "assets/sounds/died_01.wav";
+    gameState->playerPos = {8 * 2, 2 * 8};
   }
 
   gameState->updateTimer += frameTime;
@@ -113,8 +119,8 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
       input->keys[keyIdx].halfTransitionCount = 0;
     }
   }
-  float interp_dt = (float)(gameState->updateTimer / UPDATE_DELAY);
-  draw(interp_dt);
+  float interpolatedDT = (float)(gameState->updateTimer / UPDATE_DELAY);
+  draw(interpolatedDT);
 }
 
 // #############################################################################
@@ -163,53 +169,71 @@ IRect get_player_rect()
 {
   return 
   {
-    gameState->playerPos.x + 6 * 6, 
-    gameState->playerPos.y + 2 * 6, 
-    9 * 6, 
-    16 * 6
+    gameState->playerPos.x + 6, 
+    gameState->playerPos.y + 2, 
+    9, 
+    16
   };
 }
 
 void draw(float interpDT)
 {
+  Vec2 prevSolidRemainder = {};
+  Vec2 solidRemainder = {};
+
   for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
   {
     Solid solid = solids[solidIdx];
-    IVec2 solidPos = lerp(solid.prevPos, solid.rect.pos, interpDT);
-    draw_quad(solidPos, solid.rect.size);
+    if(solid.remainder.x && solid.remainder.y)
+    {
+      solidRemainder = solid.remainder;
+    }
+
+    Vec2 solidPos = lerp(vec_2(solid.prevPos)  + solid.prevRemainder, 
+                         vec_2(solid.rect.pos) + solid.remainder, 
+                         interpDT);
+
+    draw_quad(solidPos * (float)worldScale, vec_2(solid.rect.size) * (float)worldScale);
   }
 
-  IRect playerRect = get_player_rect();
-  IVec2 playerPos = lerp(gameState->prevPlayerPos, gameState->playerPos, interpDT);
-  draw_quad(playerRect.pos, playerRect.size);
-  draw_sprite(SPRITE_CELESTE_01, vec_2(gameState->playerPos));
+  IRect playerRect = get_player_rect();  
+
+  Vec2 playerPos = lerp(vec_2(gameState->prevPlayerPos) + 
+                          (standingOnPlatofrm? prevSolidRemainder : prevRemainder), 
+                        vec_2(gameState->playerPos) +
+                          (standingOnPlatofrm? solidRemainder : Vec2{xRemainder, yRemainder}), 
+                        interpDT);
+
+  draw_quad(playerPos * worldScale, vec_2(playerRect.size) * worldScale);
+  draw_sprite(SPRITE_CELESTE_01, playerPos * worldScale, worldScale);
 }
 
 void update()
 {
   update_game_input();
   gameState->prevPlayerPos = gameState->playerPos;
+  prevRemainder = {xRemainder, yRemainder};
+  standingOnPlatofrm = false;
 
   // We update the logic at a fixed rate to keep the game stable 
   // and to save on performance
   float dt = UPDATE_DELAY;
 
   // Movement Data needed for Celeste
-  float maxRunSpeed = 10.0f;
-  float wallJumpSpeed = 15.0f;
-  float runAcceleration = 50.0f;
-  float fallSideAcceleration = 35.0f;
-  float maxJumpSpeed = -14.0f;
-  float fallSpeed = 18.0f;
-  float gravity = 70.0f;
-  float runReduce = 80.0f;
-  float wallClimbSpeed = -4.0f;
-  float wallSlideDownSpeed = 8.0f;
+  float maxRunSpeed = 10.0f / 3.6f;
+  float wallJumpSpeed = 15.0f / 3.6f;
+  float runAcceleration = 50.0f / 3.6f;
+  float fallSideAcceleration = 35.0f / 3.6f;
+  float maxJumpSpeed = -14.0f / 3.6f;
+  float fallSpeed = 18.0f / 3.6f;
+  float gravity = 70.0f / 3.6f;
+  float runReduce = 80.0f / 3.6f;
+  float wallClimbSpeed = -4.0f / 3.6f;
+  float wallSlideDownSpeed = 8.0f / 3.6f;
   static Vec2 speed;
+  Vec2 solidSpeed = {};
   static float highestHeight = input->screenSize.y;
   static float varJumpTimer = 0.0f;
-  static float xRemainder = 0.0f;
-  static float yRemainder = 0.0f;
   static float wallJumpTimer = 0.0f;
   static bool playerGrounded = true;
   static bool grabbingWall = false;
@@ -218,6 +242,7 @@ void update()
   {
     Solid* solid = &solids[solidIdx];
     solid->prevPos = solid->rect.pos;
+    solid->prevRemainder = solid->remainder;
 
     if(solid->keyframes.count > 1)
     {
@@ -255,14 +280,15 @@ void update()
                 (nextKeyframe.time - currentKeyframe.time);
 
       Vec2 nextPos = vec_2(currentKeyframe.pos) + vec_2(nextKeyframe.pos - currentKeyframe.pos) * t;
+      float speedX = nextPos.x - (float)solid->rect.pos.x;
       // Move X
       {
-        float amount = nextPos.x - (float)solid->rect.pos.x;
-        xRemainder += amount; 
-        int move = round(xRemainder);   
+        float amount = speedX;
+        solid->remainder.x += amount; 
+        int move = round(solid->remainder.x);   
         if (move != 0) 
         { 
-          xRemainder -= move; 
+          solid->remainder.x -= move; 
           int moveSign = sign(move);
           while (move != 0) 
           { 
@@ -282,11 +308,17 @@ void update()
               if(solidRect.pos.y <= playerRect.pos.y + playerRect.size.y)
               {
                 gameState->playerPos.x += moveSign;
+                solidSpeed.x = speedX;
               }
                 
               for(int subSolidIdx = 0; subSolidIdx < ArraySize(solids);
                   subSolidIdx++)
               {
+                if(subSolidIdx == solidIdx)
+                {
+                  continue;
+                }
+
                 IRect subSolidRect = solids[subSolidIdx].rect;
                 if(rect_collision(get_player_rect(), subSolidRect))
                 {
@@ -298,17 +330,18 @@ void update()
             solid->rect.pos.x += moveSign; 
             move -= moveSign; 
           } 
-        } 
+        }
       }
 
       // Move Y
+      float speedY = nextPos.y - (float)solid->rect.pos.y;
       {
         float amount = nextPos.y - (float)solid->rect.pos.y;
-        xRemainder += amount; 
-        int move = round(xRemainder);   
+        solid->remainder.y += amount; 
+        int move = round(solid->remainder.y);   
         if (move != 0) 
         { 
-          xRemainder -= move; 
+          solid->remainder.y -= move; 
           int moveSign = sign(move);
           while (move != 0) 
           { 
@@ -324,22 +357,29 @@ void update()
             // Is the player currently standing on this Solid
             if(rect_collision(playerRect, newSolidRect))
             {
+              standingOnPlatofrm = true;
+
               if(solidRect.pos.y <= playerRect.pos.y + playerRect.size.y)
               {
                 gameState->playerPos.y += moveSign;
+                solidSpeed.y = speedY;
               }
 
               for(int subSolidIdx = 0; subSolidIdx < ArraySize(solids);
                   subSolidIdx++)
               {
+                if(subSolidIdx == solidIdx)
+                {
+                  continue;
+                }
+
                 IRect subSolidRect = solids[subSolidIdx].rect;
                 if(rect_collision(get_player_rect(), subSolidRect))
                 {
-                  gameState->playerPos = {50, 0};
+                  gameState->playerPos = {8 * 2, 8 * 2};
                 }
               }
             }
-
 
             solid->rect.pos.y += moveSign; 
             move -= moveSign; 
@@ -351,7 +391,7 @@ void update()
 
   if(key_pressed_this_frame(KEY_R))
   {
-    gameState->playerPos = {50, 50};
+    gameState->playerPos = {8 * 2, 8 * 2};
   }
 
   float directionChangeMult = 1.6f;
@@ -405,7 +445,17 @@ void update()
     {
       play_sound(gameState->jumpSound);
       varJumpTimer = 0.0f;
-      speed.y = maxJumpSpeed;
+      speed.y = maxJumpSpeed + solidSpeed.y * 1.5f;
+      float xMulti = 2.5f;
+      if(solidSpeed.x)
+      {
+        if(speed.x < 0 && solidSpeed.x > 0 ||
+          speed.x > 0 && solidSpeed.x < 0)
+        {
+          xMulti = 0.5f;
+        }
+        speed.x = solidSpeed.x * xMulti;
+      }
       playerGrounded = false;
       gameState->gameInput[INPUT_JUMP].justPressed = false;
     }
@@ -421,8 +471,8 @@ void update()
       for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
       {
         IRect playerRect = get_player_rect();
-        playerRect.pos.x -= 2 * 6;
-        playerRect.size.x += 4 * 6;
+        playerRect.pos.x -= 2;
+        playerRect.size.x += 4;
         IRect solidRect = solids[solidIdx].rect;
 
         if(rect_collision(solidRect, playerRect))
@@ -475,8 +525,8 @@ void update()
       for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
       {
         IRect playerRect = get_player_rect();
-        playerRect.pos.x -= 2 * 6;
-        playerRect.size.x += 4 * 6;
+        playerRect.pos.x -= 2;
+        playerRect.size.x += 4;
         IRect solidRect = solids[solidIdx].rect;
 
         if(rect_collision(solidRect, playerRect))
@@ -587,6 +637,7 @@ void update()
     if (move != 0) 
     { 
       yRemainder -= move; 
+      bool jumpingCollisionHappend = false;
       int moveSign = sign(move);
       while (move != 0) 
       { 
@@ -598,11 +649,26 @@ void update()
           newPlayerRect.pos.y += moveSign;
           IRect solidRect = solids[solidIdx].rect;
 
+          IRect jumpGraceRect = newPlayerRect;
+          jumpGraceRect.size.y += 2; // Jumping Grace???
+
+          if(rect_collision(solidRect, jumpGraceRect) &&
+             moveSign > 0)
+          {
+            jumpingCollisionHappend = true;
+          }
+
           if(rect_collision(solidRect, newPlayerRect))
           {
             collisionHappened = true;
             break;
           }
+
+        }
+
+        if(jumpingCollisionHappend)
+        {
+          playerGrounded = true;
         }
 
         if(!collisionHappened)
@@ -617,10 +683,6 @@ void update()
           if(moveSign < 0)
           {
             speed.y = 0.0f;
-          }
-          if(moveSign > 0)
-          {
-            playerGrounded = true;
           }
           break;
         }

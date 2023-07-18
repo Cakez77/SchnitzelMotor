@@ -113,7 +113,7 @@ int main()
     return -1;
   }
 
-  platform_set_vsync(true);
+  platform_set_vsync(false);
 
   while(running)
   {
