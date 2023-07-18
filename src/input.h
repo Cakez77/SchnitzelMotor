@@ -93,7 +93,7 @@ struct Input
 {
   Vec2 screenSize;
 
-  Key keys[KEY_COUNT];
+  Key keys[MAX_KEYCODES];
 };
 
 // #############################################################################
