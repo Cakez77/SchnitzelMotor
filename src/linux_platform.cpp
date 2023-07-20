@@ -10,7 +10,7 @@
 // #############################################################################
 //                           Linux Defines
 // #############################################################################
-
+static constexpr int BUTTONS_KEYCODE_OFFSET = 250;
 
 // #############################################################################
 //                           Linux Globals
@@ -26,10 +26,10 @@ static Window window;
 // #############################################################################
 void platform_fill_keycode_lookup_table()
 {
- // Mouse
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Pointer_Button1)] = KEY_LEFT_MOUSE;
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Pointer_Button3)] = KEY_MIDDLE_MOUSE;
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Pointer_Button2)] = KEY_RIGHT_MOUSE;
+  // Mouse
+  KeyCodeLookupTable[BUTTONS_KEYCODE_OFFSET + Button1] = KEY_LEFT_MOUSE;
+  KeyCodeLookupTable[BUTTONS_KEYCODE_OFFSET + Button2] = KEY_MIDDLE_MOUSE;
+  KeyCodeLookupTable[BUTTONS_KEYCODE_OFFSET + Button3] = KEY_RIGHT_MOUSE;
 
   // A - Z
   KeyCodeLookupTable[XKeysymToKeycode(display, XK_A)] = KEY_A;
@@ -111,34 +111,31 @@ void platform_fill_keycode_lookup_table()
   KeyCodeLookupTable[XKeysymToKeycode(display, XK_slash)] = KEY_FORWARD_SLASH;
   KeyCodeLookupTable[XKeysymToKeycode(display, XK_backslash)] = KEY_BACKWARD_SLASH;
 
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Tab)] = KEY_TAB,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Escape)] = KEY_ESCAPE,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Pause)] = KEY_PAUSE,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Up)] = KEY_UP,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Down)] = KEY_DOWN,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Left)] = KEY_LEFT,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Right)] = KEY_RIGHT,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_BackSpace)] = KEY_BACKSPACE,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Return)] = KEY_RETURN,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Delete)] = KEY_DELETE,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Insert)] = KEY_INSERT,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Home)] = KEY_HOME,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_End)] = KEY_END,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Page_Up)] = KEY_PAGE_UP,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Page_Down)] = KEY_PAGE_DOWN,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Caps_Lock)] = KEY_CAPS_LOCK,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Num_Lock)] = KEY_NUM_LOCK,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Scroll_Lock)] = KEY_SCROLL_LOCK,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Menu)] = KEY_MENU,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Shift_L)] = KEY_SHIFT,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Shift_L)] = KEY_SHIFT,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Shift_R)] = KEY_SHIFT,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Control_L)] = KEY_CONTROL,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Control_L)] = KEY_CONTROL,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Control_R)] = KEY_CONTROL,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Alt_L)] = KEY_ALT,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Alt_L)] = KEY_ALT,
-  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Alt_R)] = KEY_ALT,
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Tab)] = KEY_TAB;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Escape)] = KEY_ESCAPE;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Pause)] = KEY_PAUSE;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Up)] = KEY_UP;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Down)] = KEY_DOWN;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Left)] = KEY_LEFT;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Right)] = KEY_RIGHT;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_BackSpace)] = KEY_BACKSPACE;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Return)] = KEY_RETURN;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Delete)] = KEY_DELETE;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Insert)] = KEY_INSERT;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Home)] = KEY_HOME;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_End)] = KEY_END;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Page_Up)] = KEY_PAGE_UP;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Page_Down)] = KEY_PAGE_DOWN;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Caps_Lock)] = KEY_CAPS_LOCK;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Num_Lock)] = KEY_NUM_LOCK;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Scroll_Lock)] = KEY_SCROLL_LOCK;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Menu)] = KEY_MENU;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Shift_L)] = KEY_SHIFT;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Shift_R)] = KEY_SHIFT;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Control_L)] = KEY_CONTROL;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Control_R)] = KEY_CONTROL;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Alt_L)] = KEY_ALT;
+  KeyCodeLookupTable[XKeysymToKeycode(display, XK_Alt_R)] = KEY_ALT;
   KeyCodeLookupTable[XKeysymToKeycode(display, XK_F1)] = KEY_F1;
   KeyCodeLookupTable[XKeysymToKeycode(display, XK_F2)] = KEY_F2;
   KeyCodeLookupTable[XKeysymToKeycode(display, XK_F3)] = KEY_F3;
@@ -162,7 +159,6 @@ void platform_fill_keycode_lookup_table()
   KeyCodeLookupTable[XKeysymToKeycode(display, XK_KP_8)] = KEY_NUMPAD_8;
   KeyCodeLookupTable[XKeysymToKeycode(display, XK_KP_9)] = KEY_NUMPAD_9;
 }
-  
 
 bool platform_create_window(int width, int height, char* title)
 {
@@ -217,7 +213,9 @@ bool platform_create_window(int width, int height, char* title)
   // Set the input mask for our window on the current display
   // ExposureMask | KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask | 
   // PointerMotionMask | ButtonMotionMask | FocusChangeMask
-  long event_mask = KeyPressMask | KeyReleaseMask | KeymapStateMask | ExposureMask;
+  long event_mask = ExposureMask
+                  | KeyPressMask | KeyReleaseMask
+                  | ButtonPressMask | ButtonReleaseMask;
   XSelectInput(display, window, event_mask);
 
   XMapWindow(display, window);
@@ -232,6 +230,17 @@ bool platform_create_window(int width, int height, char* title)
 
 void platform_update_window()
 {
+  Window root;
+  Window child;
+  int root_x;
+  int root_y;
+  int win_x;
+  int win_y;
+  unsigned int mask_return;
+  XQueryPointer(display, window, &root, &child, &root_x, &root_y, &win_x, &win_y, &mask_return);
+  input->mousePosScreen = Vec2{(float)win_x, (float)win_y};
+  input->mousePosWorld = input->mousePosScreen / worldScale;
+
   // XPending doesn't block
   while (XPending(display))
   {
@@ -253,6 +262,21 @@ void platform_update_window()
       {
         bool isDown = event.type == KeyPress;
         KeyCodes keyCode = KeyCodeLookupTable[event.xkey.keycode];
+        Key* key = &input->keys[keyCode];
+
+        key->justPressed = !key->justPressed && !key->isDown && isDown;
+        key->justReleased = !key->justReleased && key->isDown && !isDown;
+        key->isDown = isDown;
+        key->halfTransitionCount++;
+
+        break;
+      }
+
+      case ButtonPress:
+      case ButtonRelease:
+      {
+        bool isDown = event.type == ButtonPress;
+        KeyCodes keyCode = KeyCodeLookupTable[BUTTONS_KEYCODE_OFFSET + event.xbutton.button];
         Key* key = &input->keys[keyCode];
 
         key->justPressed = !key->justPressed && !key->isDown && isDown;
