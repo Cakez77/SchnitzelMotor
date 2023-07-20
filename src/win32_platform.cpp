@@ -1,4 +1,5 @@
 #define WIN32_LEAN_AND_MEAN
+#define GET
 #define NOMINMAX
 #include <windows.h>
 #include <xaudio2.h>
@@ -77,11 +78,33 @@ LRESULT CALLBACK windows_window_callback(HWND window, UINT msg,
     case WM_SYSKEYDOWN:
     case WM_SYSKEYUP:
     {
-      bool isDown = (msg == WM_KEYDOWN) || (msg == WM_SYSKEYDOWN);
+      bool isDown = (msg == WM_KEYDOWN) || (msg == WM_SYSKEYDOWN) ||
+                    (msg == WM_LBUTTONDOWN);
+
       KeyCodes keyCode = KeyCodeLookupTable[wParam];
-
       Key* key = &input->keys[keyCode];
+      key->justPressed = !key->justPressed && !key->isDown && isDown;
+      key->justReleased = !key->justReleased && key->isDown && !isDown;
+      key->isDown = isDown;
+      key->halfTransitionCount++;
 
+      break;
+    }
+
+    case WM_LBUTTONDOWN:
+    case WM_MBUTTONDOWN:
+    case WM_RBUTTONDOWN:
+    case WM_LBUTTONUP:
+    case WM_MBUTTONUP:
+    case WM_RBUTTONUP:
+    {
+      bool isDown = (msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN || msg == WM_MBUTTONDOWN);
+      int mouseCode = 
+        (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP)? VK_LBUTTON: 
+        (msg == WM_MBUTTONDOWN || msg == WM_MBUTTONUP)? VK_MBUTTON: VK_RBUTTON;
+
+      KeyCodes keyCode = KeyCodeLookupTable[mouseCode];
+      Key* key = &input->keys[keyCode];
       key->justPressed = !key->justPressed && !key->isDown && isDown;
       key->justReleased = !key->justReleased && key->isDown && !isDown;
       key->isDown = isDown;
@@ -414,6 +437,14 @@ bool platform_create_window(int width, int height, char* title)
 void platform_update_window()
 {
   MSG msg;
+
+  POINT p;
+  GetCursorPos(&p);
+  // Think about it
+  ScreenToClient(window, &p);
+
+  input->mousePosScreen = Vec2{(float)p.x, (float)p.y};
+  input->mousePosWorld = input->mousePosScreen / worldScale;
 
   while(PeekMessageA(&msg, window, 0, 0, PM_REMOVE))
   {

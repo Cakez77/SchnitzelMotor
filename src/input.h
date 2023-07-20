@@ -92,6 +92,8 @@ struct Key
 struct Input
 {
   Vec2 screenSize;
+  Vec2 mousePosScreen;
+  Vec2 mousePosWorld;
 
   Key keys[MAX_KEYCODES];
 };

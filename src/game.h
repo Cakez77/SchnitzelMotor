@@ -9,7 +9,7 @@
 // #############################################################################
 constexpr int UPDATES_PER_SECOND = 60;
 constexpr double UPDATE_DELAY = 1.0 / UPDATES_PER_SECOND;
-constexpr IVec2 WORLD_SIZE = {330, 170};
+constexpr IVec2 WORLD_SIZE = {320, 180};
 
 // #############################################################################
 //                           Game Structs
@@ -42,6 +42,8 @@ struct GameState
   Sound jumpSound;
   Sound deathSound;
 };
+
+static int worldScale = 4;
 
 extern "C"
 {

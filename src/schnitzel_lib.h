@@ -183,6 +183,12 @@ Vec2 operator*(Vec2 a, Vec2 b)
   return Vec2{a.x * b.x, a.y * b.y};
 }
 
+Vec2 operator/(Vec2 a, int scalar)
+{
+  return Vec2{a.x / (float)scalar, 
+              a.y / (float)scalar};
+}
+
 Vec2 operator-(Vec2 a)
 {
   return Vec2{-a.x, -a.y};
@@ -208,6 +214,12 @@ struct IVec2
   int x;
   int y;
 };
+
+IVec2 operator/(IVec2 a, float scalar)
+{
+  return IVec2{(int)((float)a.x / scalar), 
+               (int)((float)a.y / scalar)};
+}
 
 IVec2 operator-(IVec2 a, IVec2 b)
 {

@@ -35,17 +35,24 @@
 // #############################################################################
 //                           Game Globals
 // #############################################################################
-static int worldScale = 5;
 static GameState* gameState;
 static Vec2 prevRemainder = {};
 static float xRemainder = 0.0f;
 static float yRemainder = 0.0f;
-static bool standingOnPlatofrm = false;
+static bool standingOnPlatform = false;
+
+struct Tile
+{
+  SpriteID spriteID;
+  bool active;
+};
+
+static Array<Tile, WORLD_SIZE.x / 8 * WORLD_SIZE.y / 8> tiles;
 
 static Solid solids [] =
 {
   {
-    // .rect = {48 * 13, 48 * 2, 48, 48 * 8},
+    // .rect = {8 * 13, 8 * 2, 8, 8 * 11},
   },
   {
     // .rect = {48 *  8, 48 * 2, 48, 48 * 8}
@@ -97,6 +104,9 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
 
     gameState->jumpSound.path = "assets/sounds/jump_01.wav";
     gameState->deathSound.path = "assets/sounds/died_01.wav";
+    tiles.count = tiles.maxElements;
+
+    tiles[1].active = true;
   }
 
   if(!gameState->initialized)
@@ -161,50 +171,49 @@ void update_game_input()
     input->keys[KEY_Q].isDown;
 }
 
-void move_x(float amount) 
-{
-}
-
 IRect get_player_rect()
 {
   return 
   {
     gameState->playerPos.x + 6, 
     gameState->playerPos.y + 2, 
-    9, 
+    8, 
     16
   };
 }
 
 void draw(float interpDT)
 {
-  Vec2 prevSolidRemainder = {};
-  Vec2 solidRemainder = {};
+  // Tiles
+  {
+    for(int tileIdx = 0; tileIdx < tiles.maxElements; tileIdx++)
+    {
+      int rowIdx = tileIdx / (WORLD_SIZE.x / 8);
+      int colIdx = tileIdx % (WORLD_SIZE.x / 8);
+      Tile tile = tiles[tileIdx];
+
+      if(tile.active)
+      {
+        draw_sprite(SPRITE_TILE_01, 
+                    vec_2(IVec2{colIdx * worldScale * 8, rowIdx * worldScale * 8}),
+                    worldScale);
+      }
+    }
+  }
 
   for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
   {
     Solid solid = solids[solidIdx];
-    if(solid.remainder.x && solid.remainder.y)
-    {
-      solidRemainder = solid.remainder;
-    }
-
-    Vec2 solidPos = lerp(vec_2(solid.prevPos)  + solid.prevRemainder, 
-                         vec_2(solid.rect.pos) + solid.remainder, 
+    Vec2 solidPos = lerp(vec_2(solid.prevPos), 
+                         vec_2(solid.rect.pos), 
                          interpDT);
 
     draw_quad(solidPos * (float)worldScale, vec_2(solid.rect.size) * (float)worldScale);
   }
 
-  IRect playerRect = get_player_rect();  
-
-  Vec2 playerPos = lerp(vec_2(gameState->prevPlayerPos) + 
-                          (standingOnPlatofrm? prevSolidRemainder : prevRemainder), 
-                        vec_2(gameState->playerPos) +
-                          (standingOnPlatofrm? solidRemainder : Vec2{xRemainder, yRemainder}), 
+  Vec2 playerPos = lerp(vec_2(gameState->prevPlayerPos), 
+                        vec_2(gameState->playerPos), 
                         interpDT);
-
-  draw_quad(playerPos * worldScale, vec_2(playerRect.size) * worldScale);
   draw_sprite(SPRITE_CELESTE_01, playerPos * worldScale, worldScale);
 }
 
@@ -213,7 +222,25 @@ void update()
   update_game_input();
   gameState->prevPlayerPos = gameState->playerPos;
   prevRemainder = {xRemainder, yRemainder};
-  standingOnPlatofrm = false;
+  standingOnPlatform = false;
+
+  if(key_is_down(KEY_LEFT_MOUSE))
+  {
+    int colIdx = (int)input->mousePosWorld.x / 8;
+    int rowIdx = (int)input->mousePosWorld.y / 8;
+
+    int tileIdx = rowIdx * WORLD_SIZE.x / 8 + colIdx;
+    tiles[tileIdx].active = true;
+  }
+
+  if(key_is_down(KEY_RIGHT_MOUSE))
+  {
+    int colIdx = (int)input->mousePosWorld.x / 8;
+    int rowIdx = (int)input->mousePosWorld.y / 8;
+
+    int tileIdx = rowIdx * WORLD_SIZE.x / 8 + colIdx;
+    tiles[tileIdx].active = false;
+  }
 
   // We update the logic at a fixed rate to keep the game stable 
   // and to save on performance
@@ -357,7 +384,7 @@ void update()
             // Is the player currently standing on this Solid
             if(rect_collision(playerRect, newSolidRect))
             {
-              standingOnPlatofrm = true;
+              standingOnPlatform = true;
 
               if(solidRect.pos.y <= playerRect.pos.y + playerRect.size.y)
               {
@@ -468,11 +495,12 @@ void update()
 
     if(just_pressed(INPUT_JUMP))
     {
+      IRect playerRect = get_player_rect();
+      playerRect.pos.x -= 2;
+      playerRect.size.x += 4;
+
       for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
       {
-        IRect playerRect = get_player_rect();
-        playerRect.pos.x -= 2;
-        playerRect.size.x += 4;
         IRect solidRect = solids[solidIdx].rect;
 
         if(rect_collision(solidRect, playerRect))
@@ -490,6 +518,9 @@ void update()
             varJumpTimer = 0.0f;
             speed.x = wallJumpSpeed;
             speed.y = maxJumpSpeed;
+
+            play_sound(gameState->jumpSound);
+            break;
           }
 
           // Colliding on the Left
@@ -500,9 +531,56 @@ void update()
             varJumpTimer = 0.0f;
             speed.x = -wallJumpSpeed;
             speed.y = maxJumpSpeed;
+
+            play_sound(gameState->jumpSound);
+            break;
           }
 
-          play_sound(gameState->jumpSound);
+        }
+      }
+
+      for(int tileIdx = 0; tileIdx < tiles.count; tileIdx++)
+      {
+        Tile tile = tiles[tileIdx];
+
+        if(tile.active)
+        {
+          int rowIdx = tileIdx / (WORLD_SIZE.x / 8);
+          int colIdx = tileIdx % (WORLD_SIZE.x / 8);
+
+          IRect tileRect = IRect{colIdx * 8, rowIdx * 8, 8, 8};
+          if(rect_collision(tileRect, playerRect))
+          {
+            int playerRectLeft = playerRect.pos.x;
+            int playerRectRight = playerRect.pos.x + playerRect.size.x;
+            int tileRectLeft = tileRect.pos.x;
+            int tileRectRight = tileRect.pos.x + tileRect.size.x;
+
+            // Colliding on the Right
+            if(tileRectRight - playerRectLeft <
+              playerRectRight - tileRectLeft)
+            {
+              wallJumpTimer = 0.1f;
+              varJumpTimer = 0.0f;
+              speed.x = wallJumpSpeed;
+              speed.y = maxJumpSpeed;
+              play_sound(gameState->jumpSound);
+              break;
+            }
+
+            // Colliding on the Left
+            if(tileRectRight - playerRectLeft >
+              playerRectRight - tileRectLeft)
+            {
+              wallJumpTimer = 0.1f;
+              varJumpTimer = 0.0f;
+              speed.x = -wallJumpSpeed;
+              speed.y = maxJumpSpeed;
+              play_sound(gameState->jumpSound);
+              break;
+            }
+
+          }
         }
       }
     }
@@ -522,11 +600,12 @@ void update()
     if(is_down(INPUT_WALL_GRAB) && 
        wallJumpTimer == 0.0f)
     {
+      IRect playerRect = get_player_rect();
+      playerRect.pos.x -= 2;
+      playerRect.size.x += 4;
+
       for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
       {
-        IRect playerRect = get_player_rect();
-        playerRect.pos.x -= 2;
-        playerRect.size.x += 4;
         IRect solidRect = solids[solidIdx].rect;
 
         if(rect_collision(solidRect, playerRect))
@@ -550,6 +629,42 @@ void update()
           {
             speed.x = 0;
             grabbingWall = true;
+          }
+        }
+      }
+
+      for(int tileIdx = 0; tileIdx < tiles.count; tileIdx++)
+      {
+        Tile tile = tiles[tileIdx];
+
+        if(tile.active)
+        {
+          int rowIdx = tileIdx / (WORLD_SIZE.x / 8);
+          int colIdx = tileIdx % (WORLD_SIZE.x / 8);
+
+          IRect tileRect = IRect{colIdx * 8, rowIdx * 8, 8, 8};
+          if(rect_collision(tileRect, playerRect))
+          {
+            int playerRectLeft = playerRect.pos.x;
+            int playerRectRight = playerRect.pos.x + playerRect.size.x;
+            int tileRectLeft = tileRect.pos.x;
+            int tileRectRight = tileRect.pos.x + tileRect.size.x;
+            
+            // Colliding on the Right
+            if(tileRectRight - playerRectLeft <
+              playerRectRight - tileRectLeft)
+            {
+              speed.x = 0;
+              grabbingWall = true;
+            }
+
+            // Colliding on the Left
+            if(tileRectRight - playerRectLeft >
+              playerRectRight - tileRectLeft)
+            {
+              speed.x = 0;
+              grabbingWall = true;
+            }
           }
         }
       }
@@ -599,12 +714,13 @@ void update()
       int moveSign = sign(move);
       while (move != 0) 
       { 
+        IRect playerRect = get_player_rect();
+        IRect newPlayerRect = playerRect;
+        newPlayerRect.pos.x += moveSign;
+
         bool collisionHappened = false;
         for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
         {
-          IRect playerRect = get_player_rect();
-          IRect newPlayerRect = playerRect;
-          newPlayerRect.pos.x += moveSign;
           IRect solidRect = solids[solidIdx].rect;
 
           if(rect_collision(solidRect, newPlayerRect))
@@ -616,9 +732,38 @@ void update()
 
         if(!collisionHappened)
         {
-          //There is no Solid immediately beside us, move
-          gameState->playerPos.x += moveSign; 
-          move -= moveSign; 
+          for(int tileIdx = 0; tileIdx < tiles.count; tileIdx++)
+          {
+            Tile tile = tiles[tileIdx];
+
+            if(tile.active)
+            {
+              int rowIdx = tileIdx / (WORLD_SIZE.x / 8);
+              int colIdx = tileIdx % (WORLD_SIZE.x / 8);
+
+              IRect tileRect = IRect{colIdx * 8, rowIdx * 8, 8, 8};
+
+              if(rect_collision(tileRect, newPlayerRect))
+              {
+                collisionHappened = true;
+                break;
+              }
+            }
+          }
+
+          if(!collisionHappened)
+          {
+            //There is no Solid immediately beside us, move
+            gameState->playerPos.x += moveSign; 
+            move -= moveSign; 
+          }
+          else
+          {
+            speed.x = 0.0f;
+            xRemainder = 0.0f;
+            break;
+          }
+
         }
         else
         {
@@ -641,10 +786,10 @@ void update()
       int moveSign = sign(move);
       while (move != 0) 
       { 
+        IRect playerRect = get_player_rect();
         bool collisionHappened = false;
         for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
         {
-          IRect playerRect = get_player_rect();
           IRect newPlayerRect = playerRect;
           newPlayerRect.pos.y += moveSign;
           IRect solidRect = solids[solidIdx].rect;
@@ -673,9 +818,52 @@ void update()
 
         if(!collisionHappened)
         {
-          // There is no Solid immediately beside us, move
-          gameState->playerPos.y += moveSign; 
-          move -= moveSign; 
+          for(int tileIdx = 0; tileIdx < tiles.count; tileIdx++)
+          {
+            Tile tile = tiles[tileIdx];
+
+            if(tile.active)
+            {
+              IRect newPlayerRect = playerRect;
+              newPlayerRect.pos.y += moveSign;
+              int rowIdx = tileIdx / (WORLD_SIZE.x / 8);
+              int colIdx = tileIdx % (WORLD_SIZE.x / 8);
+
+              IRect jumpGraceRect = newPlayerRect;
+              jumpGraceRect.size.y += 2; // Jumping Grace???
+
+              IRect tileRect = IRect{colIdx * 8, rowIdx * 8, 8, 8};
+
+              if(rect_collision(tileRect, jumpGraceRect) &&
+                moveSign > 0)
+              {
+                jumpingCollisionHappend = true;
+              }
+
+              if(rect_collision(tileRect, newPlayerRect))
+              {
+                collisionHappened = true;
+                break;
+              }
+            }
+          }
+
+          if(!collisionHappened)
+          {
+            // There is no Solid immediately beside us, move
+            gameState->playerPos.y += moveSign; 
+            move -= moveSign; 
+          }
+          else
+          {
+            // Hit a solid! Don't move!
+            if(moveSign < 0)
+            {
+              speed.y = 0.0f;
+            }
+            break;
+          }
+
         }
         else
         {
