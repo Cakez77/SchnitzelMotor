@@ -7,6 +7,7 @@
 static constexpr int MAX_CONCURRENT_SOUNDS = 16;
 static constexpr int MAX_ALLOCATED_SOUNDS = 64;
 static constexpr int SOUNDS_BUFFER_SIZE = MB(128);
+static constexpr int MAX_SOUND_PATH_LENGTH = 256;
 
 static constexpr float FADE_DURATION = 1.0f;
 
@@ -23,7 +24,7 @@ typedef int SoundOptions;
 
 struct Sound
 {
-	char* path;
+	char path[MAX_SOUND_PATH_LENGTH];
 	float volume = 1.0f;
 	SoundOptions options;
 	int size;
@@ -85,7 +86,6 @@ void play_sound(Sound sound)
 			return;
 		}
 		sound.size = wavFile->header.dataChunkSize;
-		sound.path = sound.path;
 		sound.data = &soundState->allocatedsoundsBuffer[soundState->bytesUsed];
 		soundState->bytesUsed += sound.size;
 		memcpy(sound.data, &wavFile->dataBegin, sound.size);

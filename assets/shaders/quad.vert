@@ -1,11 +1,14 @@
 #version 430
 
+const int RENDERING_OPTION_FLIP_X = (1 << 0);
 struct Transform
 {
   vec2 pos;
   vec2 size;
   vec2 atlasOffset;
   vec2 spriteSize;
+  int renderOptions;
+  int padding;
 };
 
 // Input Uniforms
@@ -43,6 +46,13 @@ void main()
   float top = t.atlasOffset.y;
   float right = t.atlasOffset.x + t.spriteSize.x;
   float bottom = t.atlasOffset.y + t.spriteSize.y;
+
+  if(bool(t.renderOptions & RENDERING_OPTION_FLIP_X))
+  {
+    float tmpLeft = left;
+    left = right;
+    right = tmpLeft;
+  }
 
   vec2 textureCoords[6] =
   {

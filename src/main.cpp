@@ -93,7 +93,8 @@ int main()
   // Allocating Data for Sounds
   soundState->allocatedsoundsBuffer = bump_alloc(&persistentStorage, SOUNDS_BUFFER_SIZE);
 
-  if(!platform_create_window(WORLD_SIZE.x * worldScale, WORLD_SIZE.y * worldScale, 
+  if(!platform_create_window(WORLD_SIZE.x * TILESIZE * worldScale, 
+                             WORLD_SIZE.y * TILESIZE * worldScale, 
                              "Schnitzel Motor"))
   {
     SM_ERROR("Failed to create Windows Window");

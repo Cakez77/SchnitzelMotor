@@ -5,10 +5,12 @@
 
 struct GLContext
 {
+  char* texturePath;
   int programID;
   int transformSBOID;
   int screenSizeID;
   int textureID;
+  long long textureTimestamp;
 };
 
 static GLContext glContext;
@@ -109,15 +111,20 @@ bool gl_init(BumpAllocator* transientStorage)
   // Load our first Texture
   {
     int width, height, nChannels;
-    char* data = (char*)stbi_load("assets/textures/Texture_Atlas_01.png", 
+    glContext.texturePath = "assets/textures/Texture_Atlas_01.png";
+    char* data = (char*)stbi_load(glContext.texturePath, 
                                   &width, &height, &nChannels, 4);
     int textureSizeInBytes = 4 * width * height;
+
+    glContext.textureTimestamp = get_timestamp(glContext.texturePath);
 
     if(!data)
     {
       SM_ASSERT(0, "Failed to load Texture!");
       return false;
     }
+
+    glContext.textureTimestamp = get_timestamp(glContext.texturePath);
 
     glGenTextures(1, (GLuint*)&glContext.textureID);
     glActiveTexture(GL_TEXTURE0);
@@ -151,6 +158,24 @@ bool gl_init(BumpAllocator* transientStorage)
 
 void gl_render()
 {
+  // Hot reload texure
+  long long textureTimestamp = get_timestamp(glContext.texturePath);
+  if(textureTimestamp > glContext.textureTimestamp)
+  {
+    int width, height, nChannels;
+    char* data = (char*)stbi_load(glContext.texturePath, 
+                                  &width, &height, &nChannels, 4);
+    if(data)
+    {
+      int textureSizeInBytes = 4 * width * height;
+    
+
+      glContext.textureTimestamp = textureTimestamp;
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+      stbi_image_free(data);
+    }
+  }
+
   // Linux Colors, kinda
   glClearColor(0.2f, 0.02f, 0.2f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT);

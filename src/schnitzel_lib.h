@@ -126,7 +126,6 @@ struct Array
   }
 };
 
-
 // #############################################################################
 //                           Math stuff
 // #############################################################################
@@ -246,6 +245,11 @@ Vec2 vec_2(IVec2 ivec2)
   return Vec2{(float)ivec2.x, (float)ivec2.y};
 }
 
+Vec2 vec_2(float scalar)
+{
+  return Vec2{scalar, scalar};
+}
+
 IVec2 ivec_2(Vec2 ivec2)
 {
   return IVec2{(int)ivec2.x, (int)ivec2.y};
@@ -254,6 +258,27 @@ IVec2 ivec_2(Vec2 ivec2)
 float lerp(float a, float b, float t)
 {
   return a + (b - a) * t;
+}
+
+float length(Vec2 v)
+{
+  return sqrt(v.x * v.x + v.y * v.y);
+}
+
+Vec2 normalize(Vec2 v)
+{
+  Vec2 normalized = {};
+  float vecLength = length(v);
+  if(vecLength)
+  {
+    normalized = v / length(v);
+  }
+  else
+  {
+    SM_ASSERT(0, "Vector has a length of 0");
+  }
+
+  return normalized;
 }
 
 Vec2 lerp(Vec2 a, Vec2 b, float t)
@@ -286,10 +311,10 @@ struct IRect
 
 bool rect_collision(IRect a, IRect b)
 {
-  return a.pos.x < b.pos.x  + b.size.x &&
-         a.pos.x + a.size.x > b.pos.x  &&
-         a.pos.y < b.pos.y  + b.size.y &&
-         a.pos.y + a.size.y > b.pos.y;
+  return a.pos.x < b.pos.x  + b.size.x && // Collision on Left of a and right of b
+         a.pos.x + a.size.x > b.pos.x  && // Collision on Right of a and left of b
+         a.pos.y < b.pos.y  + b.size.y && // Collision on Bottom of a and Top of b
+         a.pos.y + a.size.y > b.pos.y;    // Collision on Top of a and Bottom of b
 }
 
 // #############################################################################

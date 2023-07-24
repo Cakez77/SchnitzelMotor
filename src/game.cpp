@@ -40,14 +40,15 @@ static Vec2 prevRemainder = {};
 static float xRemainder = 0.0f;
 static float yRemainder = 0.0f;
 static bool standingOnPlatform = false;
+static Vec2 speed;
+static int renderOptions;
 
-struct Tile
+struct Tileset
 {
-  SpriteID spriteID;
-  bool active;
+  Array<Vec2, 21> tileCoords;
 };
 
-static Array<Tile, WORLD_SIZE.x / 8 * WORLD_SIZE.y / 8> tiles;
+static Tileset tileset;
 
 static Solid solids [] =
 {
@@ -82,9 +83,10 @@ static Solid solids [] =
 // #############################################################################
 bool is_down(GameInputType type);
 bool just_pressed(GameInputType type);
-void update_game_input();
+void update_game_input(float dt);
 void move_x();
 IRect get_player_rect();
+IRect get_player_jump_rect();
 void draw(float interpolatedDT);
 void update();
 
@@ -102,11 +104,40 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
     gameState = gameStateIn;
     soundState = soundStateIn;
 
-    gameState->jumpSound.path = "assets/sounds/jump_01.wav";
-    gameState->deathSound.path = "assets/sounds/died_01.wav";
-    tiles.count = tiles.maxElements;
+    // Sounds
+    char* jumpSound = "assets/sounds/jump_01.wav";
+    char* deathSound = "assets/sounds/died_01.wav";
+    memcpy(gameState->jumpSound.path, jumpSound, strlen(jumpSound));
+    memcpy(gameState->deathSound.path, deathSound, strlen(deathSound));
 
-    tiles[1].active = true;
+    tileset.tileCoords.add({192, 0});
+    tileset.tileCoords.add({200, 0});
+    tileset.tileCoords.add({208, 0});
+    tileset.tileCoords.add({216, 0});
+
+    tileset.tileCoords.add({192, 8});
+    tileset.tileCoords.add({200, 8});
+    tileset.tileCoords.add({208, 8});
+    tileset.tileCoords.add({216, 8});
+
+    tileset.tileCoords.add({192, 16});
+    tileset.tileCoords.add({200, 16});
+    tileset.tileCoords.add({208, 16});
+    tileset.tileCoords.add({216, 16});
+
+    tileset.tileCoords.add({192, 24});
+    tileset.tileCoords.add({200, 24});
+    tileset.tileCoords.add({208, 24});
+    tileset.tileCoords.add({216, 24});
+
+    // Corners
+    tileset.tileCoords.add({192, 32});
+    tileset.tileCoords.add({200, 32});
+    tileset.tileCoords.add({208, 32});
+    tileset.tileCoords.add({216, 32});
+
+    // Black inside
+    tileset.tileCoords.add({192, 40});
   }
 
   if(!gameState->initialized)
@@ -146,7 +177,7 @@ bool just_pressed(GameInputType type)
   return gameState->gameInput[type].justPressed;
 }
 
-void update_game_input()
+void update_game_input(float dt)
 {
   // Moving
   gameState->gameInput[INPUT_MOVE_LEFT].isDown = input->keys[KEY_A].isDown;
@@ -159,8 +190,19 @@ void update_game_input()
   gameState->gameInput[INPUT_MOVE_DOWN].isDown |= input->keys[KEY_DOWN].isDown;
 
   // Jumping
-  gameState->gameInput[INPUT_JUMP].justPressed = 
-    input->keys[KEY_SPACE].justPressed;
+  GameInput* jumpInput  = &gameState->gameInput[INPUT_JUMP];
+  jumpInput->bufferingTime = max(0.0f, jumpInput->bufferingTime - dt);
+  if(input->keys[KEY_SPACE].justPressed)
+  {
+    gameState->gameInput[INPUT_JUMP].justPressed = true;
+    gameState->gameInput[INPUT_JUMP].bufferingTime = 0.125f;
+  }
+
+  if(gameState->gameInput[INPUT_JUMP].bufferingTime == 0.0f)
+  {
+    jumpInput->justPressed = input->keys[KEY_SPACE].justPressed;
+  }
+
   gameState->gameInput[INPUT_JUMP].isDown = 
     input->keys[KEY_SPACE].isDown;
 
@@ -169,6 +211,14 @@ void update_game_input()
     input->keys[KEY_E].isDown;
   gameState->gameInput[INPUT_WALL_GRAB].isDown |=
     input->keys[KEY_Q].isDown;
+
+  // Dashing
+  gameState->gameInput[INPUT_DASH].justPressed  = input->keys[KEY_Q].justPressed;
+  gameState->gameInput[INPUT_DASH].justPressed  = input->keys[KEY_E].justPressed;
+  gameState->gameInput[INPUT_DASH].justPressed  = input->keys[KEY_K].justPressed;
+  gameState->gameInput[INPUT_DASH].justPressed |= input->keys[KEY_Q].justPressed;
+  gameState->gameInput[INPUT_DASH].justPressed |= input->keys[KEY_E].justPressed;
+  gameState->gameInput[INPUT_DASH].justPressed |= input->keys[KEY_K].justPressed;
 }
 
 IRect get_player_rect()
@@ -182,21 +232,102 @@ IRect get_player_rect()
   };
 }
 
+Tile* get_tile(int x, int y)
+{
+  if(x < 0 || x >= WORLD_SIZE.x || y < 0 || y >= WORLD_SIZE.y) return nullptr;
+  return &gameState->tiles[y * WORLD_SIZE.x + x];
+}
+
+Tile* get_tile(Vec2 worldPos)
+{
+  int x = worldPos.x / TILESIZE;
+  int y = worldPos.y / TILESIZE;
+
+  return get_tile(x, y);
+}
+
 void draw(float interpDT)
 {
+  IRect playerCollider = get_player_rect();
+  draw_quad(playerCollider.pos * worldScale, playerCollider.size * worldScale);
+
   // Tiles
   {
-    for(int tileIdx = 0; tileIdx < tiles.maxElements; tileIdx++)
-    {
-      int rowIdx = tileIdx / (WORLD_SIZE.x / 8);
-      int colIdx = tileIdx % (WORLD_SIZE.x / 8);
-      Tile tile = tiles[tileIdx];
+    // Neighbouring Tiles       Top    Left  Right Bottom  
+    int neighbourOffsets[24] = { 0,-1,  -1,0,  1,0,  0,1,   
+    //                         Topleft Topright Bottomleft Bottomright
+                                -1,-1,   1,-1,     -1,1,      1,1,
+    //                          Top2   Left2  Right2 Bottom2
+                                 0,-2,  -2,0,  2,0,  0,2};
 
-      if(tile.active)
+    // Topleft     = BIT(4) = 16
+    // Toplright   = BIT(5) = 32
+    // Bottomleft  = BIT(6) = 64
+    // Bottomright = BIT(7) = 128
+
+    for(int x = 0; x < WORLD_SIZE.x; x++)
+    {
+      for(int y = 0; y < WORLD_SIZE.y; y++)
       {
-        draw_sprite(SPRITE_TILE_01, 
-                    vec_2(IVec2{colIdx * worldScale * 8, rowIdx * worldScale * 8}),
-                    worldScale);
+        Tile* tile = get_tile(x, y);
+
+        if(!tile->active)
+        {
+          continue;
+        }
+
+        // Reset mask every frame
+        tile->neighbourMask = 0;
+        int neighbourCount = 0;
+        int extendedNeighbourCount = 0;
+        int emptyNeighbourSlot = 0;
+
+        // Look at all 4 Neighbours
+        for(int n = 0; n < 12; n++) 
+        {
+          Tile* neighbour = get_tile(x + neighbourOffsets[n * 2],
+                                     y + neighbourOffsets[n * 2 + 1]);
+
+
+          if(!neighbour || neighbour->active)
+          {
+            tile->neighbourMask |= BIT(n);
+            if(n < 8)
+            {
+              neighbourCount++;
+            }
+            else
+            {
+              extendedNeighbourCount++;
+            }
+          }
+          else if(n < 8)
+          { 
+            emptyNeighbourSlot = n;
+          }
+        }
+
+        if(neighbourCount == 7 && emptyNeighbourSlot >= 4) // We have a corner
+        {
+          tile->neighbourMask = 16 + (emptyNeighbourSlot - 4);
+        }
+        else if(neighbourCount == 8 && extendedNeighbourCount == 4)
+        {
+          tile->neighbourMask = 20;
+        }
+        else
+        {
+          tile->neighbourMask = tile->neighbourMask & 0b1111;
+        }
+
+        // Draw Tile
+        Transform transform = {};
+        transform.atlasOffset = tileset.tileCoords[tile->neighbourMask];
+        transform.pos = Vec2{float(x * TILESIZE * worldScale), 
+                             float(y * TILESIZE * worldScale)};
+        transform.size = Vec2{8.0f * worldScale, 8.0f * worldScale};
+        transform.spriteSize = Vec2{8.0f, 8.0f};
+        draw_quad(transform);
       }
     }
   }
@@ -214,56 +345,69 @@ void draw(float interpDT)
   Vec2 playerPos = lerp(vec_2(gameState->prevPlayerPos), 
                         vec_2(gameState->playerPos), 
                         interpDT);
-  draw_sprite(SPRITE_CELESTE_01, playerPos * worldScale, worldScale);
+  
+  if(speed.x > 0)
+  {
+    renderOptions = 0;
+  }
+  if(speed.x < 0)
+  {
+    renderOptions |= RENDERING_OPTION_FLIP_X ;
+  }
+
+
+  draw_sprite(SPRITE_CELESTE_01, playerPos * worldScale, worldScale, renderOptions);
 }
 
 void update()
 {
-  update_game_input();
+  // We update the logic at a fixed rate to keep the game stable 
+  // and to save on performance
+  float dt = UPDATE_DELAY;
+
+  update_game_input(dt);
   gameState->prevPlayerPos = gameState->playerPos;
   prevRemainder = {xRemainder, yRemainder};
   standingOnPlatform = false;
 
   if(key_is_down(KEY_LEFT_MOUSE))
   {
-    int colIdx = (int)input->mousePosWorld.x / 8;
-    int rowIdx = (int)input->mousePosWorld.y / 8;
-
-    int tileIdx = rowIdx * WORLD_SIZE.x / 8 + colIdx;
-    tiles[tileIdx].active = true;
+    Tile* tile = get_tile(input->mousePosWorld);
+    if(tile)
+    {
+      tile->active = true;
+    }
   }
 
   if(key_is_down(KEY_RIGHT_MOUSE))
   {
-    int colIdx = (int)input->mousePosWorld.x / 8;
-    int rowIdx = (int)input->mousePosWorld.y / 8;
-
-    int tileIdx = rowIdx * WORLD_SIZE.x / 8 + colIdx;
-    tiles[tileIdx].active = false;
+    Tile* tile = get_tile(input->mousePosWorld);
+    if(tile)
+    {
+      tile->active = false;
+    }
   }
 
-  // We update the logic at a fixed rate to keep the game stable 
-  // and to save on performance
-  float dt = UPDATE_DELAY;
-
   // Movement Data needed for Celeste
-  float maxRunSpeed = 10.0f / 3.6f;
-  float wallJumpSpeed = 15.0f / 3.6f;
+  float maxRunSpeed = 2.0f;
+  float wallJumpSpeed = 3.0f;
   float runAcceleration = 50.0f / 3.6f;
   float fallSideAcceleration = 35.0f / 3.6f;
-  float maxJumpSpeed = -14.0f / 3.6f;
+  float maxJumpSpeed = -3.0f;
   float fallSpeed = 18.0f / 3.6f;
+  float dashSpeed = 4.2f;
   float gravity = 70.0f / 3.6f;
   float runReduce = 80.0f / 3.6f;
   float wallClimbSpeed = -4.0f / 3.6f;
   float wallSlideDownSpeed = 8.0f / 3.6f;
-  static Vec2 speed;
   Vec2 solidSpeed = {};
   static float highestHeight = input->screenSize.y;
   static float varJumpTimer = 0.0f;
   static float wallJumpTimer = 0.0f;
   static bool playerGrounded = true;
   static bool grabbingWall = false;
+  static float dashTimer = 0.0f;
+  static int dashCounter = playerGrounded;
 
   for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
   {
@@ -422,7 +566,8 @@ void update()
   }
 
   float directionChangeMult = 1.6f;
-  if(is_down(INPUT_MOVE_LEFT))
+  if(is_down(INPUT_MOVE_LEFT) &&
+     !is_down(INPUT_MOVE_RIGHT))
   {
     float mult = 1.0f;
     if(speed.x > 0.0f)
@@ -441,7 +586,8 @@ void update()
 
   }
 
-  if(is_down(INPUT_MOVE_RIGHT))
+  if(is_down(INPUT_MOVE_RIGHT) &&
+     !is_down(INPUT_MOVE_LEFT))
   {
     float mult = 1.0f;
     if(speed.x < 0.0f)
@@ -539,47 +685,47 @@ void update()
         }
       }
 
-      for(int tileIdx = 0; tileIdx < tiles.count; tileIdx++)
+      for(int x = 0; x < WORLD_SIZE.x; x++)
       {
-        Tile tile = tiles[tileIdx];
-
-        if(tile.active)
+        for(int y = 0; y < WORLD_SIZE.y; y++)
         {
-          int rowIdx = tileIdx / (WORLD_SIZE.x / 8);
-          int colIdx = tileIdx % (WORLD_SIZE.x / 8);
+          Tile* tile = get_tile(x, y);
 
-          IRect tileRect = IRect{colIdx * 8, rowIdx * 8, 8, 8};
-          if(rect_collision(tileRect, playerRect))
+          if(tile->active)
           {
-            int playerRectLeft = playerRect.pos.x;
-            int playerRectRight = playerRect.pos.x + playerRect.size.x;
-            int tileRectLeft = tileRect.pos.x;
-            int tileRectRight = tileRect.pos.x + tileRect.size.x;
-
-            // Colliding on the Right
-            if(tileRectRight - playerRectLeft <
-              playerRectRight - tileRectLeft)
+            IRect tileRect = IRect{x * 8, y * 8, 8, 8};
+            if(rect_collision(tileRect, playerRect))
             {
-              wallJumpTimer = 0.1f;
-              varJumpTimer = 0.0f;
-              speed.x = wallJumpSpeed;
-              speed.y = maxJumpSpeed;
-              play_sound(gameState->jumpSound);
-              break;
-            }
+              int playerRectLeft = playerRect.pos.x;
+              int playerRectRight = playerRect.pos.x + playerRect.size.x;
+              int tileRectLeft = tileRect.pos.x;
+              int tileRectRight = tileRect.pos.x + tileRect.size.x;
 
-            // Colliding on the Left
-            if(tileRectRight - playerRectLeft >
-              playerRectRight - tileRectLeft)
-            {
-              wallJumpTimer = 0.1f;
-              varJumpTimer = 0.0f;
-              speed.x = -wallJumpSpeed;
-              speed.y = maxJumpSpeed;
-              play_sound(gameState->jumpSound);
-              break;
-            }
+              // Colliding on the Right
+              if(tileRectRight - playerRectLeft <
+                playerRectRight - tileRectLeft)
+              {
+                wallJumpTimer = 0.1f;
+                varJumpTimer = 0.0f;
+                speed.x = wallJumpSpeed;
+                speed.y = maxJumpSpeed;
+                play_sound(gameState->jumpSound);
+                break;
+              }
 
+              // Colliding on the Left
+              if(tileRectRight - playerRectLeft >
+                playerRectRight - tileRectLeft)
+              {
+                wallJumpTimer = 0.1f;
+                varJumpTimer = 0.0f;
+                speed.x = -wallJumpSpeed;
+                speed.y = maxJumpSpeed;
+                play_sound(gameState->jumpSound);
+                break;
+              }
+
+            }
           }
         }
       }
@@ -588,8 +734,75 @@ void update()
     varJumpTimer += dt;
   }
 
+  // Dash
+  if(just_pressed(INPUT_DASH) && dashCounter > 0)
+  {
+    speed.y = 0.0f;
+
+    Vec2 dir = {0.0f, 0.0f};
+
+    if(!is_down(INPUT_MOVE_LEFT) &&
+       !is_down(INPUT_MOVE_RIGHT) &&
+       !is_down(INPUT_MOVE_UP) &&
+       !is_down(INPUT_MOVE_DOWN))
+    {
+      if(renderOptions & RENDERING_OPTION_FLIP_X)
+      {
+        // Left
+        dir.x = -1.0f;
+      }
+      else
+      {
+        // Right
+        dir.x = 1.0f;
+      }
+
+    }
+
+    if(is_down(INPUT_MOVE_LEFT) &&
+       !is_down(INPUT_MOVE_RIGHT))
+    {
+      dir.x = -1.0f;
+    }
+
+    if(is_down(INPUT_MOVE_RIGHT) &&
+       !is_down(INPUT_MOVE_LEFT))
+    {
+      dir.x = 1.0f;
+    }
+
+    if(is_down(INPUT_MOVE_UP) &&
+      !is_down(INPUT_MOVE_DOWN))
+    {
+      dir.y = -1.0f;
+    }
+
+    if(is_down(INPUT_MOVE_DOWN) &&
+      !is_down(INPUT_MOVE_UP))
+    {
+      dir.y = 1.0f;
+    }
+
+    if(!is_down(INPUT_MOVE_UP) &&
+       !is_down(INPUT_MOVE_DOWN))
+    {
+      dashTimer = 0.1f;
+    }
+
+
+    dir = normalize(dir);
+    speed.x = (int)(dir.x * dashSpeed);
+    speed.y = (int)(dir.y * dashSpeed);
+
+    dashCounter--;
+  }
+  else
+  {
+    dashTimer = max(0.0f, dashTimer - dt);
+  }
+
   // Gravity
-  if(!grabbingWall)
+  if(!grabbingWall && dashTimer == 0.0f)
   {
     speed.y = approach(speed.y, fallSpeed, gravity * dt);
   }
@@ -633,37 +846,37 @@ void update()
         }
       }
 
-      for(int tileIdx = 0; tileIdx < tiles.count; tileIdx++)
+      for(int x = 0; x < WORLD_SIZE.x; x++)
       {
-        Tile tile = tiles[tileIdx];
-
-        if(tile.active)
+        for(int y = 0; y < WORLD_SIZE.y; y++)
         {
-          int rowIdx = tileIdx / (WORLD_SIZE.x / 8);
-          int colIdx = tileIdx % (WORLD_SIZE.x / 8);
+          Tile* tile = get_tile(x, y);
 
-          IRect tileRect = IRect{colIdx * 8, rowIdx * 8, 8, 8};
-          if(rect_collision(tileRect, playerRect))
+          if(tile->active)
           {
-            int playerRectLeft = playerRect.pos.x;
-            int playerRectRight = playerRect.pos.x + playerRect.size.x;
-            int tileRectLeft = tileRect.pos.x;
-            int tileRectRight = tileRect.pos.x + tileRect.size.x;
-            
-            // Colliding on the Right
-            if(tileRectRight - playerRectLeft <
-              playerRectRight - tileRectLeft)
+            IRect tileRect = IRect{x * 8, y * 8, 8, 8};
+            if(rect_collision(tileRect, playerRect))
             {
-              speed.x = 0;
-              grabbingWall = true;
-            }
+              int playerRectLeft = playerRect.pos.x;
+              int playerRectRight = playerRect.pos.x + playerRect.size.x;
+              int tileRectLeft = tileRect.pos.x;
+              int tileRectRight = tileRect.pos.x + tileRect.size.x;
+              
+              // Colliding on the Right
+              if(tileRectRight - playerRectLeft <
+                playerRectRight - tileRectLeft)
+              {
+                speed.x = 0;
+                grabbingWall = true;
+              }
 
-            // Colliding on the Left
-            if(tileRectRight - playerRectLeft >
-              playerRectRight - tileRectLeft)
-            {
-              speed.x = 0;
-              grabbingWall = true;
+              // Colliding on the Left
+              if(tileRectRight - playerRectLeft >
+                playerRectRight - tileRectLeft)
+              {
+                speed.x = 0;
+                grabbingWall = true;
+              }
             }
           }
         }
@@ -712,13 +925,13 @@ void update()
     { 
       xRemainder -= move; 
       int moveSign = sign(move);
+      bool collisionHappened = false;
       while (move != 0) 
       { 
         IRect playerRect = get_player_rect();
         IRect newPlayerRect = playerRect;
         newPlayerRect.pos.x += moveSign;
 
-        bool collisionHappened = false;
         for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
         {
           IRect solidRect = solids[solidIdx].rect;
@@ -732,24 +945,26 @@ void update()
 
         if(!collisionHappened)
         {
-          for(int tileIdx = 0; tileIdx < tiles.count; tileIdx++)
+          for(int x = 0; x < WORLD_SIZE.x; x++)
           {
-            Tile tile = tiles[tileIdx];
-
-            if(tile.active)
+            for(int y = 0; y < WORLD_SIZE.y; y++)
             {
-              int rowIdx = tileIdx / (WORLD_SIZE.x / 8);
-              int colIdx = tileIdx % (WORLD_SIZE.x / 8);
+              Tile* tile = get_tile(x, y);
 
-              IRect tileRect = IRect{colIdx * 8, rowIdx * 8, 8, 8};
-
-              if(rect_collision(tileRect, newPlayerRect))
+              if(tile->active)
               {
-                collisionHappened = true;
-                break;
+                IRect tileRect = IRect{x * 8, y * 8, 8, 8};
+
+                if(rect_collision(tileRect, newPlayerRect))
+                {
+                  collisionHappened = true;
+                  goto handle_collision;
+                }
               }
             }
           }
+
+          handle_collision:
 
           if(!collisionHappened)
           {
@@ -782,72 +997,59 @@ void update()
     if (move != 0) 
     { 
       yRemainder -= move; 
-      bool jumpingCollisionHappend = false;
       int moveSign = sign(move);
+      bool jumpingCollisionHappend = false;
+      bool collisionHappened = false;
       while (move != 0) 
       { 
         IRect playerRect = get_player_rect();
-        bool collisionHappened = false;
+        IRect newPlayerRect = playerRect;
+        newPlayerRect.pos.y += moveSign;
+
         for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
         {
-          IRect newPlayerRect = playerRect;
-          newPlayerRect.pos.y += moveSign;
           IRect solidRect = solids[solidIdx].rect;
-
-          IRect jumpGraceRect = newPlayerRect;
-          jumpGraceRect.size.y += 2; // Jumping Grace???
-
-          if(rect_collision(solidRect, jumpGraceRect) &&
-             moveSign > 0)
-          {
-            jumpingCollisionHappend = true;
-          }
 
           if(rect_collision(solidRect, newPlayerRect))
           {
+            if(speed.y > 0.0f)
+            {
+              playerGrounded = true;
+              dashCounter = 1;
+            }
+
             collisionHappened = true;
             break;
           }
-
-        }
-
-        if(jumpingCollisionHappend)
-        {
-          playerGrounded = true;
         }
 
         if(!collisionHappened)
         {
-          for(int tileIdx = 0; tileIdx < tiles.count; tileIdx++)
+          for(int x = 0; x < WORLD_SIZE.x; x++)
           {
-            Tile tile = tiles[tileIdx];
-
-            if(tile.active)
+            for(int y = 0; y < WORLD_SIZE.y; y++)
             {
-              IRect newPlayerRect = playerRect;
-              newPlayerRect.pos.y += moveSign;
-              int rowIdx = tileIdx / (WORLD_SIZE.x / 8);
-              int colIdx = tileIdx % (WORLD_SIZE.x / 8);
+              Tile* tile = get_tile(x, y);
 
-              IRect jumpGraceRect = newPlayerRect;
-              jumpGraceRect.size.y += 2; // Jumping Grace???
-
-              IRect tileRect = IRect{colIdx * 8, rowIdx * 8, 8, 8};
-
-              if(rect_collision(tileRect, jumpGraceRect) &&
-                moveSign > 0)
+              if(tile->active)
               {
-                jumpingCollisionHappend = true;
-              }
+                IRect tileRect = IRect{x * 8, y * 8, 8, 8};
 
-              if(rect_collision(tileRect, newPlayerRect))
-              {
-                collisionHappened = true;
-                break;
+                if(rect_collision(tileRect, newPlayerRect))
+                {
+                  if(speed.y > 0.0f)
+                  {
+                    playerGrounded = true;
+                    dashCounter = 1;
+                  }
+                  collisionHappened = true;
+                  goto handle_collision2;
+                }
               }
             }
           }
 
+          handle_collision2:
           if(!collisionHappened)
           {
             // There is no Solid immediately beside us, move
@@ -864,6 +1066,10 @@ void update()
             break;
           }
 
+          if(jumpingCollisionHappend)
+          {
+            playerGrounded = true;
+          }
         }
         else
         {

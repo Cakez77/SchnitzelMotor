@@ -9,7 +9,8 @@
 // #############################################################################
 constexpr int UPDATES_PER_SECOND = 60;
 constexpr double UPDATE_DELAY = 1.0 / UPDATES_PER_SECOND;
-constexpr IVec2 WORLD_SIZE = {320, 180};
+constexpr int TILESIZE = 8;
+constexpr IVec2 WORLD_SIZE = {320 / TILESIZE, 180 / TILESIZE};
 
 // #############################################################################
 //                           Game Structs
@@ -22,6 +23,7 @@ enum GameInputType
   INPUT_WALL_GRAB,
   INPUT_MOVE_UP,
   INPUT_MOVE_DOWN,
+  INPUT_DASH,
 
   GAME_INPUT_COUNT
 };
@@ -30,7 +32,15 @@ struct GameInput
 {
   b8 isDown;
   b8 justPressed;
+  float bufferingTime;
 };
+
+struct Tile
+{
+  bool active;
+  int neighbourMask;
+};
+
 
 struct GameState
 {
@@ -41,6 +51,7 @@ struct GameState
   GameInput gameInput[GAME_INPUT_COUNT];
   Sound jumpSound;
   Sound deathSound;
+  Tile tiles[WORLD_SIZE.x * WORLD_SIZE.y];
 };
 
 static int worldScale = 4;
