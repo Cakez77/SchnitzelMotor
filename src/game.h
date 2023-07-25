@@ -35,9 +35,16 @@ struct GameInput
   float bufferingTime;
 };
 
+enum TileType
+{
+  TILE_TYPE_NONE,
+  TILE_TYPE_SOLID,
+  TILE_TYPE_SPIKE
+};
+
 struct Tile
 {
-  bool active;
+  TileType type;
   int neighbourMask;
 };
 

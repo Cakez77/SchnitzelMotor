@@ -3,6 +3,7 @@
 #include "input.h"
 #include "render_interface.h"
 
+constexpr float DEATH_ANIM_TIME = 0.25f;
 // #############################################################################
 //                           Game Structs
 // #############################################################################
@@ -42,6 +43,7 @@ static float yRemainder = 0.0f;
 static bool standingOnPlatform = false;
 static Vec2 speed;
 static int renderOptions;
+static float deathAnimTimer = DEATH_ANIM_TIME;
 
 struct Tileset
 {
@@ -106,7 +108,7 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
 
     // Sounds
     char* jumpSound = "assets/sounds/jump_01.wav";
-    char* deathSound = "assets/sounds/died_01.wav";
+    char* deathSound = "assets/sounds/died_02.wav";
     memcpy(gameState->jumpSound.path, jumpSound, strlen(jumpSound));
     memcpy(gameState->deathSound.path, deathSound, strlen(deathSound));
 
@@ -246,10 +248,59 @@ Tile* get_tile(Vec2 worldPos)
   return get_tile(x, y);
 }
 
+int animate(float* time, int frameCount, float loopTime = 1.0f)
+{
+  if(*time > loopTime)
+  {
+    *time -= loopTime;
+  }
+
+  int animationIdx = (int)((*time / loopTime) * (float)frameCount);
+  if(animationIdx >= frameCount)
+  {
+    animationIdx = frameCount - 1;
+  }
+
+  return animationIdx;
+}
+
 void draw(float interpDT)
 {
-  IRect playerCollider = get_player_rect();
-  draw_quad(playerCollider.pos * worldScale, playerCollider.size * worldScale);
+  // IRect playerCollider = get_player_rect();
+  // draw_quad(playerCollider.pos * worldScale, playerCollider.size * worldScale);
+
+  Vec2 playerPos = lerp(vec_2(gameState->prevPlayerPos), 
+                        vec_2(gameState->playerPos), 
+                        interpDT);
+
+  // Death Animation
+  if(deathAnimTimer < DEATH_ANIM_TIME)
+  {
+    Sprite sprite = get_sprite(SPRITE_CELESTE_DEATH);
+    float t = deathAnimTimer;
+    int animationIdx = animate(&t, sprite.frameCount, DEATH_ANIM_TIME);
+
+    Transform transform = {};
+    transform.atlasOffset = vec_2(sprite.atlasOffset);
+    transform.atlasOffset.x += (float)(animationIdx * sprite.size.x);
+    transform.pos = playerPos * worldScale;
+    transform.size = Vec2{32.0f * worldScale, 32.0f * worldScale};
+    transform.spriteSize = Vec2{32.0f, 32.0f};
+
+    draw_quad(transform);
+  }
+  else
+  {  
+    if(speed.x > 0)
+    {
+      renderOptions = 0;
+    }
+    if(speed.x < 0)
+    {
+      renderOptions |= RENDERING_OPTION_FLIP_X ;
+    }
+    draw_sprite(SPRITE_CELESTE_01, playerPos * worldScale, worldScale, renderOptions);
+  }
 
   // Tiles
   {
@@ -271,8 +322,18 @@ void draw(float interpDT)
       {
         Tile* tile = get_tile(x, y);
 
-        if(!tile->active)
+        if(!tile->type)
         {
+          continue;
+        }
+
+
+        if(tile->type == TILE_TYPE_SPIKE)
+        {
+          draw_sprite(SPRITE_SPIKE, 
+                      {float(x * TILESIZE * worldScale), 
+                      float(y * TILESIZE * worldScale)}, worldScale);
+
           continue;
         }
 
@@ -289,7 +350,7 @@ void draw(float interpDT)
                                      y + neighbourOffsets[n * 2 + 1]);
 
 
-          if(!neighbour || neighbour->active)
+          if(!neighbour || neighbour->type == TILE_TYPE_SOLID)
           {
             tile->neighbourMask |= BIT(n);
             if(n < 8)
@@ -322,11 +383,11 @@ void draw(float interpDT)
 
         // Draw Tile
         Transform transform = {};
-        transform.atlasOffset = tileset.tileCoords[tile->neighbourMask];
         transform.pos = Vec2{float(x * TILESIZE * worldScale), 
                              float(y * TILESIZE * worldScale)};
         transform.size = Vec2{8.0f * worldScale, 8.0f * worldScale};
         transform.spriteSize = Vec2{8.0f, 8.0f};
+        transform.atlasOffset = tileset.tileCoords[tile->neighbourMask];
         draw_quad(transform);
       }
     }
@@ -341,22 +402,6 @@ void draw(float interpDT)
 
     draw_quad(solidPos * (float)worldScale, vec_2(solid.rect.size) * (float)worldScale);
   }
-
-  Vec2 playerPos = lerp(vec_2(gameState->prevPlayerPos), 
-                        vec_2(gameState->playerPos), 
-                        interpDT);
-  
-  if(speed.x > 0)
-  {
-    renderOptions = 0;
-  }
-  if(speed.x < 0)
-  {
-    renderOptions |= RENDERING_OPTION_FLIP_X ;
-  }
-
-
-  draw_sprite(SPRITE_CELESTE_01, playerPos * worldScale, worldScale, renderOptions);
 }
 
 void update()
@@ -364,6 +409,12 @@ void update()
   // We update the logic at a fixed rate to keep the game stable 
   // and to save on performance
   float dt = UPDATE_DELAY;
+  float prevDeathAnimTimer = deathAnimTimer;
+  deathAnimTimer  = min(DEATH_ANIM_TIME, deathAnimTimer + dt);
+  if (prevDeathAnimTimer < DEATH_ANIM_TIME && deathAnimTimer == DEATH_ANIM_TIME)
+  {
+    gameState->playerPos = {50, 0};
+  }
 
   update_game_input(dt);
   gameState->prevPlayerPos = gameState->playerPos;
@@ -375,7 +426,14 @@ void update()
     Tile* tile = get_tile(input->mousePosWorld);
     if(tile)
     {
-      tile->active = true;
+      if(key_is_down(KEY_SHIFT))
+      {
+        tile->type = TILE_TYPE_SPIKE;
+      }
+      else
+      {
+        tile->type = TILE_TYPE_SOLID;
+      }
     }
   }
 
@@ -384,7 +442,7 @@ void update()
     Tile* tile = get_tile(input->mousePosWorld);
     if(tile)
     {
-      tile->active = false;
+      tile->type = TILE_TYPE_NONE;
     }
   }
 
@@ -691,7 +749,7 @@ void update()
         {
           Tile* tile = get_tile(x, y);
 
-          if(tile->active)
+          if(tile->type)
           {
             IRect tileRect = IRect{x * 8, y * 8, 8, 8};
             if(rect_collision(tileRect, playerRect))
@@ -791,8 +849,17 @@ void update()
 
 
     dir = normalize(dir);
-    speed.x = (int)(dir.x * dashSpeed);
-    speed.y = (int)(dir.y * dashSpeed);
+    IVec2 newSpeed = {};
+    newSpeed.x = (int)(dir.x * dashSpeed);
+    newSpeed.y = (int)(dir.y * dashSpeed);
+
+    // If our current Speed in X is "faster" then we just keep that
+    if(sign(newSpeed.x) != sign(newSpeed.x) || abs((long)speed.x) < abs((long)newSpeed.x))
+    {     
+      speed.x = newSpeed.x;
+    }
+
+    speed.y = newSpeed.y;
 
     dashCounter--;
   }
@@ -852,7 +919,7 @@ void update()
         {
           Tile* tile = get_tile(x, y);
 
-          if(tile->active)
+          if(tile->type)
           {
             IRect tileRect = IRect{x * 8, y * 8, 8, 8};
             if(rect_collision(tileRect, playerRect))
@@ -926,6 +993,7 @@ void update()
       xRemainder -= move; 
       int moveSign = sign(move);
       bool collisionHappened = false;
+      bool spikeCollision = false;
       while (move != 0) 
       { 
         IRect playerRect = get_player_rect();
@@ -951,13 +1019,26 @@ void update()
             {
               Tile* tile = get_tile(x, y);
 
-              if(tile->active)
+              if(tile->type)
               {
                 IRect tileRect = IRect{x * 8, y * 8, 8, 8};
+                if(tile->type == TILE_TYPE_SPIKE)
+                {
+                  tileRect.pos.y += 4;
+                  tileRect.size.y -= 4;
+                }
 
                 if(rect_collision(tileRect, newPlayerRect))
                 {
                   collisionHappened = true;
+                  if(tile->type == TILE_TYPE_SPIKE && 
+                     deathAnimTimer == DEATH_ANIM_TIME)
+                  {
+                    spikeCollision = true;
+                    deathAnimTimer = 0.0f;
+                    speed = normalize(-speed) * dashSpeed;
+                    play_sound(gameState->deathSound);
+                  }
                   goto handle_collision;
                 }
               }
@@ -1000,6 +1081,7 @@ void update()
       int moveSign = sign(move);
       bool jumpingCollisionHappend = false;
       bool collisionHappened = false;
+      bool spikeCollision = false;
       while (move != 0) 
       { 
         IRect playerRect = get_player_rect();
@@ -1031,9 +1113,14 @@ void update()
             {
               Tile* tile = get_tile(x, y);
 
-              if(tile->active)
+              if(tile->type)
               {
                 IRect tileRect = IRect{x * 8, y * 8, 8, 8};
+                if(tile->type == TILE_TYPE_SPIKE)
+                {
+                  tileRect.pos.y += 4;
+                  tileRect.size.y -= 4;
+                }
 
                 if(rect_collision(tileRect, newPlayerRect))
                 {
@@ -1042,6 +1129,16 @@ void update()
                     playerGrounded = true;
                     dashCounter = 1;
                   }
+
+                  if(tile->type == TILE_TYPE_SPIKE &&
+                     deathAnimTimer == DEATH_ANIM_TIME)
+                  {
+                    spikeCollision = true;
+                    deathAnimTimer = 0.0f;
+                    speed = normalize(-speed) * dashSpeed;
+                    play_sound(gameState->deathSound);
+                  }
+
                   collisionHappened = true;
                   goto handle_collision2;
                 }
