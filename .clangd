@@ -1,0 +1,15 @@
+CompileFlags:
+  Add:
+    - "-ferror-limit=0"
+
+    - "-I../third_party"
+
+    - "-Wno-writable-strings"
+    - "-Wno-sign-compare"
+
+---
+
+If:
+  PathExclude: "src/game.cpp"
+CompileFlags:
+  Add: "-include main.cpp"
