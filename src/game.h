@@ -48,6 +48,11 @@ struct Tile
   int neighbourMask;
 };
 
+struct Room
+{
+  Vec2 wind;
+  Tile tiles[WORLD_SIZE.x * WORLD_SIZE.y];
+};
 
 struct GameState
 {
@@ -58,6 +63,7 @@ struct GameState
   GameInput gameInput[GAME_INPUT_COUNT];
   Sound jumpSound;
   Sound deathSound;
+  Room rooms[10];
   Tile tiles[WORLD_SIZE.x * WORLD_SIZE.y];
 };
 

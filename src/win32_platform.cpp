@@ -443,8 +443,10 @@ void platform_update_window()
   // Think about it
   ScreenToClient(window, &p);
 
+  input->prevMousePosScreen = input->mousePosScreen;
   input->mousePosScreen = Vec2{(float)p.x, (float)p.y};
   input->mousePosWorld = input->mousePosScreen / worldScale;
+  input->relMouseScreen = input->mousePosScreen - input->prevMousePosScreen;
 
   while(PeekMessageA(&msg, window, 0, 0, PM_REMOVE))
   {

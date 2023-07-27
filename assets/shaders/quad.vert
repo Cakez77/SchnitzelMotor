@@ -13,6 +13,7 @@ struct Transform
 
 // Input Uniforms
 uniform vec2 screenSize;
+uniform vec2 cameraPos;
 
 // Input Buffers
 layout(std430, binding = 0) buffer TransformSBO
@@ -66,6 +67,7 @@ void main()
 
   // Normalize Position
   vec2 vertexPos = vertices[gl_VertexID];
+  vertexPos += cameraPos;
   vertexPos.y = -vertexPos.y + screenSize.y;
   vertexPos = 2.0 * (vertexPos / screenSize) - 1.0;
 

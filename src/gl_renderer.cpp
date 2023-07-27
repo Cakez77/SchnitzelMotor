@@ -10,6 +10,7 @@ struct GLContext
   int transformSBOID;
   int screenSizeID;
   int textureID;
+  int cameraID;
   long long textureTimestamp;
 };
 
@@ -106,6 +107,7 @@ bool gl_init(BumpAllocator* transientStorage)
   // Screen Size Uniform
   {
     glContext.screenSizeID = glGetUniformLocation(glContext.programID, "screenSize");
+    glContext.cameraID = glGetUniformLocation(glContext.programID, "cameraPos");
   }
 
   // Load our first Texture
@@ -184,6 +186,7 @@ void gl_render()
 
   // Copy screenSize to the GPU
   glUniform2fv(glContext.screenSizeID, 1, &input->screenSize.x);
+  glUniform2fv(glContext.cameraID, 1, &renderData->cameraPos.x);
 
   // Copy transforms to the GPU
   glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Transform) * MAX_TRANSFORMS,

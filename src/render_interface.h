@@ -24,6 +24,7 @@ struct Transform
 
 struct RenderData
 {
+  Vec2 cameraPos;
   Array<Transform, MAX_TRANSFORMS> transforms;
 };
 

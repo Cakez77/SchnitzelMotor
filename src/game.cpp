@@ -33,6 +33,11 @@ constexpr float DEATH_ANIM_TIME = 0.25f;
     float waitingDuration;
   };
 
+  struct Tileset
+  {
+    Array<Vec2, 21> tileCoords;
+  };
+
 // #############################################################################
 //                           Game Globals
 // #############################################################################
@@ -44,14 +49,7 @@ static bool standingOnPlatform = false;
 static Vec2 speed;
 static int renderOptions;
 static float deathAnimTimer = DEATH_ANIM_TIME;
-
-struct Tileset
-{
-  Array<Vec2, 21> tileCoords;
-};
-
 static Tileset tileset;
-
 static Solid solids [] =
 {
   {
@@ -91,6 +89,17 @@ IRect get_player_rect();
 IRect get_player_jump_rect();
 void draw(float interpolatedDT);
 void update();
+int get_current_room_idx()
+{
+  int roomIdx = ((gameState->playerPos.y + 8 - 180) / -180) % 
+                ArraySize(gameState->rooms);
+  return roomIdx;
+}
+Room* get_current_room()
+{
+  Room* room = &gameState->rooms[get_current_room_idx()];
+  return room;
+}
 
 // #############################################################################
 //                           Update Game (Exported from DLL)
@@ -248,6 +257,20 @@ Tile* get_tile(Vec2 worldPos)
   return get_tile(x, y);
 }
 
+Tile* get_tile(Room* room, int x, int y)
+{
+  if(x < 0 || x >= WORLD_SIZE.x || y < 0 || y >= WORLD_SIZE.y) return nullptr;
+  return &room->tiles[y * WORLD_SIZE.x + x];
+}
+
+Tile * get_tile(Room* room, Vec2 worldPos)
+{
+  int x = worldPos.x / TILESIZE;
+  int y = worldPos.y / TILESIZE;
+
+  return get_tile(room, x, y);
+}
+
 int animate(float* time, int frameCount, float loopTime = 1.0f)
 {
   if(*time > loopTime)
@@ -268,6 +291,8 @@ void draw(float interpDT)
 {
   // IRect playerCollider = get_player_rect();
   // draw_quad(playerCollider.pos * worldScale, playerCollider.size * worldScale);
+  renderData->cameraPos.y = (get_current_room_idx() * 180) * worldScale;
+  SM_TRACE("Current Room Idx: %d", get_current_room_idx());
 
   Vec2 playerPos = lerp(vec_2(gameState->prevPlayerPos), 
                         vec_2(gameState->playerPos), 
@@ -303,7 +328,13 @@ void draw(float interpDT)
   }
 
   // Tiles
+  int currentRoomIdx = get_current_room_idx();
+  int prevRoomIdx = max(currentRoomIdx - 1, 0);
+  int nextRoomIdx = min(currentRoomIdx + 1, ArraySize(gameState->rooms));
+  for(int roomIdx = prevRoomIdx; roomIdx < nextRoomIdx; roomIdx++)
   {
+    Room* room = &gameState->rooms[roomIdx];
+
     // Neighbouring Tiles       Top    Left  Right Bottom  
     int neighbourOffsets[24] = { 0,-1,  -1,0,  1,0,  0,1,   
     //                         Topleft Topright Bottomleft Bottomright
@@ -320,7 +351,7 @@ void draw(float interpDT)
     {
       for(int y = 0; y < WORLD_SIZE.y; y++)
       {
-        Tile* tile = get_tile(x, y);
+        Tile* tile = get_tile(room, x, y);
 
         if(!tile->type)
         {
@@ -346,7 +377,8 @@ void draw(float interpDT)
         // Look at all 4 Neighbours
         for(int n = 0; n < 12; n++) 
         {
-          Tile* neighbour = get_tile(x + neighbourOffsets[n * 2],
+          Tile* neighbour = get_tile(room,
+                                     x + neighbourOffsets[n * 2],
                                      y + neighbourOffsets[n * 2 + 1]);
 
 
@@ -384,7 +416,7 @@ void draw(float interpDT)
         // Draw Tile
         Transform transform = {};
         transform.pos = Vec2{float(x * TILESIZE * worldScale), 
-                             float(y * TILESIZE * worldScale)};
+                             float(-180 * roomIdx + y * TILESIZE * worldScale)};
         transform.size = Vec2{8.0f * worldScale, 8.0f * worldScale};
         transform.spriteSize = Vec2{8.0f, 8.0f};
         transform.atlasOffset = tileset.tileCoords[tile->neighbourMask];
@@ -421,9 +453,24 @@ void update()
   prevRemainder = {xRemainder, yRemainder};
   standingOnPlatform = false;
 
+  if(key_is_down(KEY_MIDDLE_MOUSE))
+  {
+    SM_TRACE("MIddle mouse down: %.2f, %.2f", 
+      input->relMouseScreen.x, input->relMouseScreen.y);
+    // renderData->cameraPos.x += input->relMouseScreen.x? 
+
+    renderData->cameraPos = 
+      renderData->cameraPos + input->relMouseScreen * worldScale;
+
+    SM_TRACE("MIddle mouse down: %.2f, %.2f", 
+      renderData->cameraPos.x, 
+      renderData->cameraPos.y);
+  }
+
   if(key_is_down(KEY_LEFT_MOUSE))
   {
-    Tile* tile = get_tile(input->mousePosWorld);
+    Room* room = get_current_room();
+    Tile* tile = get_tile(room, input->mousePosWorld);
     if(tile)
     {
       if(key_is_down(KEY_SHIFT))
@@ -439,7 +486,8 @@ void update()
 
   if(key_is_down(KEY_RIGHT_MOUSE))
   {
-    Tile* tile = get_tile(input->mousePosWorld);
+    Room* room = get_current_room();
+    Tile* tile = get_tile(room, input->mousePosWorld);
     if(tile)
     {
       tile->type = TILE_TYPE_NONE;
@@ -743,11 +791,12 @@ void update()
         }
       }
 
+      Room* room = get_current_room();
       for(int x = 0; x < WORLD_SIZE.x; x++)
       {
         for(int y = 0; y < WORLD_SIZE.y; y++)
         {
-          Tile* tile = get_tile(x, y);
+          Tile* tile = get_tile(room, x, y);
 
           if(tile->type)
           {
@@ -913,6 +962,7 @@ void update()
         }
       }
 
+      Room* room = get_current_room();
       for(int x = 0; x < WORLD_SIZE.x; x++)
       {
         for(int y = 0; y < WORLD_SIZE.y; y++)
@@ -1013,11 +1063,12 @@ void update()
 
         if(!collisionHappened)
         {
+          Room* room = get_current_room();
           for(int x = 0; x < WORLD_SIZE.x; x++)
           {
             for(int y = 0; y < WORLD_SIZE.y; y++)
             {
-              Tile* tile = get_tile(x, y);
+              Tile* tile = get_tile(room, x, y);
 
               if(tile->type)
               {
@@ -1107,11 +1158,12 @@ void update()
 
         if(!collisionHappened)
         {
+          Room* room = get_current_room();
           for(int x = 0; x < WORLD_SIZE.x; x++)
           {
             for(int y = 0; y < WORLD_SIZE.y; y++)
             {
-              Tile* tile = get_tile(x, y);
+              Tile* tile = get_tile(room, x, y);
 
               if(tile->type)
               {
