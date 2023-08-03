@@ -9,8 +9,8 @@ struct GLContext
   int programID;
   int transformSBOID;
   int screenSizeID;
+  int projectionID;
   int textureID;
-  int cameraID;
   long long textureTimestamp;
 };
 
@@ -104,10 +104,10 @@ bool gl_init(BumpAllocator* transientStorage)
                  renderData->transforms.elements, GL_DYNAMIC_DRAW);
   }
 
-  // Screen Size Uniform
+  // Uniforms
   {
     glContext.screenSizeID = glGetUniformLocation(glContext.programID, "screenSize");
-    glContext.cameraID = glGetUniformLocation(glContext.programID, "cameraPos");
+    glContext.projectionID = glGetUniformLocation(glContext.programID, "orthoProjection");
   }
 
   // Load our first Texture
@@ -186,7 +186,21 @@ void gl_render()
 
   // Copy screenSize to the GPU
   glUniform2fv(glContext.screenSizeID, 1, &input->screenSize.x);
-  glUniform2fv(glContext.cameraID, 1, &renderData->cameraPos.x);
+
+  // Calculate projection matrix for 2D
+  {
+    OrthographicCamera2D camera = renderData->camera;
+    Vec2 dimensions = camera.dimensions * (1.0f / camera.zoom? camera.zoom : 1.0f);
+    Mat4 projectionMatrix = 
+      orthographic_projection( camera.position.x - dimensions.x / 2.0f, 
+                               camera.position.x + dimensions.x / 2.0f, 
+                               -camera.position.y - dimensions.y / 2.0f, 
+                               -camera.position.y + dimensions.y / 2.0f);
+
+    glUniformMatrix4fv(glContext.projectionID, 1, GL_FALSE, 
+                      &projectionMatrix.ax);
+  }
+
 
   // Copy transforms to the GPU
   glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Transform) * MAX_TRANSFORMS,

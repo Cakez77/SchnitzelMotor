@@ -10,7 +10,8 @@
 constexpr int UPDATES_PER_SECOND = 60;
 constexpr double UPDATE_DELAY = 1.0 / UPDATES_PER_SECOND;
 constexpr int TILESIZE = 8;
-constexpr IVec2 WORLD_SIZE = {320 / TILESIZE, 180 / TILESIZE};
+constexpr IVec2 ROOM_SIZE = {320 / TILESIZE, 180 / TILESIZE};
+constexpr IVec2 WORLD_SIZE = {320 / TILESIZE, 540 / TILESIZE};
 
 // #############################################################################
 //                           Game Structs
@@ -48,12 +49,6 @@ struct Tile
   int neighbourMask;
 };
 
-struct Room
-{
-  Vec2 wind;
-  Tile tiles[WORLD_SIZE.x * WORLD_SIZE.y];
-};
-
 struct GameState
 {
   double updateTimer;
@@ -63,7 +58,7 @@ struct GameState
   GameInput gameInput[GAME_INPUT_COUNT];
   Sound jumpSound;
   Sound deathSound;
-  Room rooms[10];
+  OrthographicCamera2D camera;
   Tile tiles[WORLD_SIZE.x * WORLD_SIZE.y];
 };
 

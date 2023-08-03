@@ -42,7 +42,6 @@ constexpr float DEATH_ANIM_TIME = 0.25f;
 //                           Game Globals
 // #############################################################################
 static GameState* gameState;
-static Vec2 prevRemainder = {};
 static float xRemainder = 0.0f;
 static float yRemainder = 0.0f;
 static bool standingOnPlatform = false;
@@ -62,17 +61,17 @@ static Solid solids [] =
     .rect = {0, 8 * 13, 8 * 22, 8}
   },
   {
-    .rect = {8 * 5, 8 * 12, 8 * 2, 8},
+    .rect = {8 * 5, 8 * 0, 8 * 2, 8},
     .keyframes = 
     {
       .count = 5,
       .elements =
       {
-        {{8 * 0, 8 * 12}, 0.0f},
-        {{8 * 8, 8 * 12}, 0.5f},
+        {{8 * 0, 8 * 0}, 0.0f},
+        {{8 * 8, 8 * 0}, 0.5f},
         {{8 * 5, 8 *  7}, 1.0f},
-        {{8 * 8, 8 * 12}, 1.5f},
-        {{8 * 0, 8 * 12}, 2.0f},
+        {{8 * 8, 8 * 0}, 1.5f},
+        {{8 * 0, 8 * 0}, 2.0f},
       }
     }
   },
@@ -81,24 +80,22 @@ static Solid solids [] =
 // #############################################################################
 //                           Game Functions
 // #############################################################################
+void update_game_input(float dt);
 bool is_down(GameInputType type);
 bool just_pressed(GameInputType type);
-void update_game_input(float dt);
-void move_x();
+void update_player(float dt);
 IRect get_player_rect();
 IRect get_player_jump_rect();
 void draw(float interpolatedDT);
 void update();
-int get_current_room_idx()
+IVec2 get_world_pos(Vec2 mousePos)
 {
-  int roomIdx = ((gameState->playerPos.y + 8 - 180) / -180) % 
-                ArraySize(gameState->rooms);
-  return roomIdx;
-}
-Room* get_current_room()
-{
-  Room* room = &gameState->rooms[get_current_room_idx()];
-  return room;
+  Vec2 localPos = mousePos / worldScale;
+  // int y = gameState->cameraPosition.y - localPos.y;
+  // int x = localPos.x - gameState->cameraPosition.x;
+  return {};
+
+  // return IVec2{x, y};
 }
 
 // #############################################################################
@@ -153,8 +150,8 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
 
   if(!gameState->initialized)
   {
+    renderData->camera.zoom = 1.0f;
     gameState->initialized = true;
-    gameState->playerPos = {8 * 2, 2 * 8};
   }
 
   gameState->updateTimer += frameTime;
@@ -178,16 +175,6 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
 // #############################################################################
 //                           Implementations
 // #############################################################################
-bool is_down(GameInputType type)
-{
-  return gameState->gameInput[type].isDown;
-}
-
-bool just_pressed(GameInputType type)
-{
-  return gameState->gameInput[type].justPressed;
-}
-
 void update_game_input(float dt)
 {
   // Moving
@@ -232,6 +219,21 @@ void update_game_input(float dt)
   gameState->gameInput[INPUT_DASH].justPressed |= input->keys[KEY_K].justPressed;
 }
 
+bool is_down(GameInputType type)
+{
+  return gameState->gameInput[type].isDown;
+}
+
+bool just_pressed(GameInputType type)
+{
+  return gameState->gameInput[type].justPressed;
+}
+
+void update_player(float dt)
+{
+
+}
+
 IRect get_player_rect()
 {
   return 
@@ -252,23 +254,19 @@ Tile* get_tile(int x, int y)
 Tile* get_tile(Vec2 worldPos)
 {
   int x = worldPos.x / TILESIZE;
-  int y = worldPos.y / TILESIZE;
+  int y = (worldPos.y + (WORLD_SIZE.y - gameState->camera.position.y)) / TILESIZE;
+
+  SM_TRACE("X: %d, Y: %d", x, y);
 
   return get_tile(x, y);
 }
 
-Tile* get_tile(Room* room, int x, int y)
-{
-  if(x < 0 || x >= WORLD_SIZE.x || y < 0 || y >= WORLD_SIZE.y) return nullptr;
-  return &room->tiles[y * WORLD_SIZE.x + x];
-}
-
-Tile * get_tile(Room* room, Vec2 worldPos)
+Tile* get_tile2(IVec2 worldPos)
 {
   int x = worldPos.x / TILESIZE;
   int y = worldPos.y / TILESIZE;
 
-  return get_tile(room, x, y);
+  return get_tile(x, y);
 }
 
 int animate(float* time, int frameCount, float loopTime = 1.0f)
@@ -289,10 +287,11 @@ int animate(float* time, int frameCount, float loopTime = 1.0f)
 
 void draw(float interpDT)
 {
+  draw_sprite(SPRITE_CELESTE_01, {0, 0}, worldScale);
   // IRect playerCollider = get_player_rect();
   // draw_quad(playerCollider.pos * worldScale, playerCollider.size * worldScale);
-  renderData->cameraPos.y = (get_current_room_idx() * 180) * worldScale;
-  SM_TRACE("Current Room Idx: %d", get_current_room_idx());
+  // renderData->cameraPos.y = (get_current_room_idx() * 180) * worldScale;
+  // SM_TRACE("Current Room Idx: %d", get_current_room_idx());
 
   Vec2 playerPos = lerp(vec_2(gameState->prevPlayerPos), 
                         vec_2(gameState->playerPos), 
@@ -328,13 +327,7 @@ void draw(float interpDT)
   }
 
   // Tiles
-  int currentRoomIdx = get_current_room_idx();
-  int prevRoomIdx = max(currentRoomIdx - 1, 0);
-  int nextRoomIdx = min(currentRoomIdx + 1, ArraySize(gameState->rooms));
-  for(int roomIdx = prevRoomIdx; roomIdx < nextRoomIdx; roomIdx++)
   {
-    Room* room = &gameState->rooms[roomIdx];
-
     // Neighbouring Tiles       Top    Left  Right Bottom  
     int neighbourOffsets[24] = { 0,-1,  -1,0,  1,0,  0,1,   
     //                         Topleft Topright Bottomleft Bottomright
@@ -351,7 +344,7 @@ void draw(float interpDT)
     {
       for(int y = 0; y < WORLD_SIZE.y; y++)
       {
-        Tile* tile = get_tile(room, x, y);
+        Tile* tile = get_tile(x, y);
 
         if(!tile->type)
         {
@@ -377,8 +370,7 @@ void draw(float interpDT)
         // Look at all 4 Neighbours
         for(int n = 0; n < 12; n++) 
         {
-          Tile* neighbour = get_tile(room,
-                                     x + neighbourOffsets[n * 2],
+          Tile* neighbour = get_tile(x + neighbourOffsets[n * 2],
                                      y + neighbourOffsets[n * 2 + 1]);
 
 
@@ -416,7 +408,7 @@ void draw(float interpDT)
         // Draw Tile
         Transform transform = {};
         transform.pos = Vec2{float(x * TILESIZE * worldScale), 
-                             float(-180 * roomIdx + y * TILESIZE * worldScale)};
+                             float((-540.0f + y * TILESIZE) * worldScale)};
         transform.size = Vec2{8.0f * worldScale, 8.0f * worldScale};
         transform.spriteSize = Vec2{8.0f, 8.0f};
         transform.atlasOffset = tileset.tileCoords[tile->neighbourMask];
@@ -441,56 +433,77 @@ void update()
   // We update the logic at a fixed rate to keep the game stable 
   // and to save on performance
   float dt = UPDATE_DELAY;
-  float prevDeathAnimTimer = deathAnimTimer;
-  deathAnimTimer  = min(DEATH_ANIM_TIME, deathAnimTimer + dt);
-  if (prevDeathAnimTimer < DEATH_ANIM_TIME && deathAnimTimer == DEATH_ANIM_TIME)
-  {
-    gameState->playerPos = {50, 0};
-  }
-
   update_game_input(dt);
-  gameState->prevPlayerPos = gameState->playerPos;
-  prevRemainder = {xRemainder, yRemainder};
-  standingOnPlatform = false;
 
-  if(key_is_down(KEY_MIDDLE_MOUSE))
+
+  // Camera controls
   {
-    SM_TRACE("MIddle mouse down: %.2f, %.2f", 
-      input->relMouseScreen.x, input->relMouseScreen.y);
-    // renderData->cameraPos.x += input->relMouseScreen.x? 
+    gameState->camera.dimensions = vec_2(ROOM_SIZE);
+    renderData->camera.dimensions = gameState->camera.dimensions * worldScale;
+    renderData->camera.position = gameState->camera.position * worldScale;
+    renderData->camera.zoom = worldScale * 2.0f;
 
-    renderData->cameraPos = 
-      renderData->cameraPos + input->relMouseScreen * worldScale;
+    // Camera Position is a multiple of 180(Room Height)
+    {
+      int roomIdx = (gameState->playerPos.y + 90) / 180;
+      gameState->camera.position.y = 180.0f * (float)roomIdx;
+    }
+    
 
-    SM_TRACE("MIddle mouse down: %.2f, %.2f", 
-      renderData->cameraPos.x, 
-      renderData->cameraPos.y);
+    if(key_is_down(KEY_Z))
+    {
+      gameState->camera.zoom += dt;
+    }
+
+    if(key_is_down(KEY_T))
+    {
+      gameState->camera.zoom -= dt;
+    }
   }
 
-  if(key_is_down(KEY_LEFT_MOUSE))
+  // Player specific
   {
-    Room* room = get_current_room();
-    Tile* tile = get_tile(room, input->mousePosWorld);
-    if(tile)
+    gameState->prevPlayerPos = gameState->playerPos;
+    standingOnPlatform = false;
+
+    // Death Animation
     {
-      if(key_is_down(KEY_SHIFT))
+      float prevDeathAnimTimer = deathAnimTimer;
+      deathAnimTimer  = min(DEATH_ANIM_TIME, deathAnimTimer + dt);
+      if (prevDeathAnimTimer < DEATH_ANIM_TIME && deathAnimTimer == DEATH_ANIM_TIME)
       {
-        tile->type = TILE_TYPE_SPIKE;
-      }
-      else
-      {
-        tile->type = TILE_TYPE_SOLID;
+        gameState->playerPos = {8 * 2, -4 * 8};
       }
     }
   }
 
-  if(key_is_down(KEY_RIGHT_MOUSE))
+  // Leveleditor
   {
-    Room* room = get_current_room();
-    Tile* tile = get_tile(room, input->mousePosWorld);
-    if(tile)
+    if(key_is_down(KEY_LEFT_MOUSE))
     {
-      tile->type = TILE_TYPE_NONE;
+      IVec2 worldPos = get_world_pos(input->mousePosScreen);
+
+      Tile* tile = get_tile2(worldPos);
+      if(tile)
+      {
+        if(key_is_down(KEY_SHIFT))
+        {
+          tile->type = TILE_TYPE_SPIKE;
+        }
+        else
+        {
+          tile->type = TILE_TYPE_SOLID;
+        }
+      }
+    }
+
+    if(key_is_down(KEY_RIGHT_MOUSE))
+    {
+      Tile* tile = get_tile(input->mousePosWorld);
+      if(tile)
+      {
+        tile->type = TILE_TYPE_NONE;
+      }
     }
   }
 
@@ -499,7 +512,7 @@ void update()
   float wallJumpSpeed = 3.0f;
   float runAcceleration = 50.0f / 3.6f;
   float fallSideAcceleration = 35.0f / 3.6f;
-  float maxJumpSpeed = -3.0f;
+  float maxJumpSpeed = 3.0f;
   float fallSpeed = 18.0f / 3.6f;
   float dashSpeed = 4.2f;
   float gravity = 70.0f / 3.6f;
@@ -668,7 +681,7 @@ void update()
 
   if(key_pressed_this_frame(KEY_R))
   {
-    gameState->playerPos = {8 * 2, 8 * 2};
+    gameState->playerPos = {8 * 2, -8 * 4};
   }
 
   float directionChangeMult = 1.6f;
@@ -791,12 +804,11 @@ void update()
         }
       }
 
-      Room* room = get_current_room();
       for(int x = 0; x < WORLD_SIZE.x; x++)
       {
         for(int y = 0; y < WORLD_SIZE.y; y++)
         {
-          Tile* tile = get_tile(room, x, y);
+          Tile* tile = get_tile(x, y);
 
           if(tile->type)
           {
@@ -917,10 +929,21 @@ void update()
     dashTimer = max(0.0f, dashTimer - dt);
   }
 
+  if(is_down(INPUT_MOVE_UP))
+  {
+    speed.y = approach(speed.y, maxJumpSpeed, 200.0f * dt);
+  }
+
+  if(is_down(INPUT_MOVE_DOWN))
+  {
+    speed.y = approach(speed.y, -maxJumpSpeed, 200.0f * dt);
+  }
+
   // Gravity
   if(!grabbingWall && dashTimer == 0.0f)
   {
-    speed.y = approach(speed.y, fallSpeed, gravity * dt);
+    // speed.y = approach(speed.y, fallSpeed, gravity * dt);
+    speed.y = approach(speed.y, 0, gravity * dt);
   }
 
   // Wall Grabbing
@@ -962,7 +985,6 @@ void update()
         }
       }
 
-      Room* room = get_current_room();
       for(int x = 0; x < WORLD_SIZE.x; x++)
       {
         for(int y = 0; y < WORLD_SIZE.y; y++)
@@ -1063,12 +1085,11 @@ void update()
 
         if(!collisionHappened)
         {
-          Room* room = get_current_room();
           for(int x = 0; x < WORLD_SIZE.x; x++)
           {
             for(int y = 0; y < WORLD_SIZE.y; y++)
             {
-              Tile* tile = get_tile(room, x, y);
+              Tile* tile = get_tile(x, y);
 
               if(tile->type)
               {
@@ -1158,12 +1179,11 @@ void update()
 
         if(!collisionHappened)
         {
-          Room* room = get_current_room();
           for(int x = 0; x < WORLD_SIZE.x; x++)
           {
             for(int y = 0; y < WORLD_SIZE.y; y++)
             {
-              Tile* tile = get_tile(room, x, y);
+              Tile* tile = get_tile(x, y);
 
               if(tile->type)
               {

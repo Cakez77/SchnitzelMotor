@@ -317,6 +317,188 @@ bool rect_collision(IRect a, IRect b)
          a.pos.y + a.size.y > b.pos.y;    // Collision on Top of a and Bottom of b
 }
 
+struct Vec4
+{
+  union
+  {
+    float values[4];
+    struct
+    {
+      float x;
+      float y;
+      float z;
+      float w;
+    };
+    
+    struct
+    {
+      float r;
+      float g;
+      float b;
+      float a;
+    };
+    
+    struct
+    {
+      float xy[2];
+    };
+    
+    struct
+    {
+      float xyz[3];
+    };
+  };
+  
+  bool operator==(Vec4 other)
+  {
+    return x == other.x && y == other.y && z == other.z && w == other.w;
+  }
+  
+  Vec4 operator+(Vec4 other) const
+  {
+    return {x + other.x,
+      y + other.y,
+      z + other.z,
+      w + other.w};
+  }
+  
+  Vec4 operator+(float value) const
+  {
+    return {x + value,
+      y + value,
+      z + value,
+      w + value};
+  }
+  
+  Vec4 operator*(float value) const
+  {
+    return {x * value,
+      y * value,
+      z * value,
+      w * value};
+  }
+  
+  Vec4 operator-(float value) const
+  {
+    return {x - value,
+      y - value,
+      z - value,
+      w - value};
+  }
+  
+  Vec4 operator*(Vec4 other) const
+  {
+    return {x * other.x,
+      y * other.y,
+      z * other.z,
+      w * other.w};
+  }
+  
+  Vec4& operator*=(float value)
+  {
+    x *= value;
+    y *= value;
+    z *= value;
+    w *= value;
+    
+    return *this;
+  }
+  
+  float& operator[](int index)
+  {
+    return values[index];
+  }
+};
+
+struct Mat4
+{
+  union 
+  {
+    Vec4 values[4];
+    struct
+    {
+      float ax;
+      float bx;
+      float cx;
+      float dx;
+
+      float ay;
+      float by;
+      float cy;
+      float dy;
+
+      float az;
+      float bz;
+      float cz;
+      float dz;
+      
+      float aw;
+      float bw;
+      float cw;
+      float dw;
+    };
+  };
+
+  Vec4& operator[](int col)
+  {
+    return values[col];
+  }
+ 
+  Mat4 operator*(Mat4 other)
+  {
+    Mat4 result = {};
+    
+    // TODO: think about how to do this in a for loop
+    
+    result.ax = ax * other.ax + bx * other.ay + cx * other.az + dx * other.aw;
+    result.ay = ay * other.ax + by * other.ay + cy * other.az + dy * other.aw;
+    result.az = az * other.ax + bz * other.ay + cz * other.az + dz * other.aw;
+    result.aw = aw * other.ax + bw * other.ay + cw * other.az + dw * other.aw;
+    
+    result.bx = ax * other.bx + bx * other.by + cx * other.bz + dx * other.bw;
+    result.by = ay * other.bx + by * other.by + cy * other.bz + dy * other.bw;
+    result.bz = az * other.bx + bz * other.by + cz * other.bz + dz * other.bw;
+    result.bw = aw * other.bx + bw * other.by + cw * other.bz + dw * other.bw;
+    
+    result.cx = ax * other.cx + bx * other.cy + cx * other.cz + dx * other.cw;
+    result.cy = ay * other.cx + by * other.cy + cy * other.cz + dy * other.cw;
+    result.cz = az * other.cx + bz * other.cy + cz * other.cz + dz * other.cw;
+    result.cw = aw * other.cx + bw * other.cy + cw * other.cz + dw * other.cw;
+    
+    result.dx = ax * other.dx + bx * other.dy + cx * other.dz + dx * other.dw;
+    result.dy = ay * other.dx + by * other.dy + cy * other.dz + dy * other.dw;
+    result.dz = az * other.dx + bz * other.dy + cz * other.dz + dz * other.dw;
+    result.dw = aw * other.dx + bw * other.dy + cw * other.dz + dw * other.dw;
+    
+    return result;
+  }
+};
+
+Mat4 mat_4(float value)
+{
+  Mat4 result = {};
+  result[0][0] = value;
+  result[1][1] = value;
+  result[2][2] = value;
+  result[3][3] = value;
+
+  return result;
+}
+
+Mat4 orthographic_projection(float left, float right, float top, float bottom)
+{
+  Mat4 result = {};
+  result.aw = -(right + left) / (right - left); 
+  result.bw = -(top + bottom) / (top - bottom);
+  result.cw = -0.0f; // Near Plane
+  result[0][0] = 2.0f / (right - left);
+  result[1][1] = 2.0f / (top - bottom);
+  result[2][2] = -1.0f / (1.0f - 0.0f);
+  result[3][3] = 1.0f;
+
+  return result;
+}
+
 // #############################################################################
 //                           Memeory Management
 // #############################################################################

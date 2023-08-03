@@ -261,9 +261,17 @@ bool platform_create_window(int width, int height, char* title)
   // (WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX)
   int dwStyle = WS_OVERLAPPEDWINDOW;
 
+  // Add Border Size of the window
+  {
+    RECT borderRect = {};
+    AdjustWindowRectEx(&borderRect, dwStyle, 0, exStyle);
+
+    width += borderRect.right - borderRect.left;
+    height += borderRect.bottom - borderRect.top;
+  }
+
   PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB;
   PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB;
-
   // Windows specific OpenGL function loading
   {
     window = CreateWindowExA(exStyle,
