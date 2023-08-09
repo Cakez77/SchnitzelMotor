@@ -96,6 +96,7 @@ struct Input
   Vec2 prevMousePosScreen;
   Vec2 mousePosScreen;
   Vec2 mousePosWorld;
+  Vec2 cameraLocalPos;
 
   Key keys[MAX_KEYCODES];
 };

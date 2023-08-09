@@ -25,3 +25,4 @@ build
 *.xcodeproj/
 generate_ctags.bat
 .tags
+!freetype.dll

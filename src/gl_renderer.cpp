@@ -1,8 +1,18 @@
 #include "gl_renderer.h"
 #include "schnitzel_lib.h"
+#include "render_interface.h"
+
+// To Load PNG Files
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+// To Load TTF Files
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
+// #############################################################################
+//                           OpenGL Structs
+// #############################################################################
 struct GLContext
 {
   char* texturePath;
@@ -11,18 +21,113 @@ struct GLContext
   int screenSizeID;
   int projectionID;
   int textureID;
+  int fontAtlasID;
   long long textureTimestamp;
 };
 
+// #############################################################################
+//                           OpenGL Globals
+// #############################################################################
 static GLContext glContext;
 
+// #############################################################################
+//                           Render Interface Implementations
+// #############################################################################
+void load_font(char* filePath, int fontSize)
+{
+  FT_Library fontLibrary;
+  FT_Init_FreeType(&fontLibrary);
+
+  FT_Face fontFace;
+  FT_New_Face(fontLibrary, filePath, 0, &fontFace);
+  FT_Set_Pixel_Sizes(fontFace, 0, fontSize);
+
+  int padding = 2;
+  int row = 0;
+  int col = padding;
+
+  const int textureWidth = 512;
+  char textureBuffer[textureWidth  * textureWidth];
+  for (FT_ULong glyphIdx = 32; glyphIdx < 127; ++glyphIdx)
+  {
+    FT_UInt glyphIndex = FT_Get_Char_Index(fontFace, glyphIdx);
+    FT_Load_Glyph(fontFace, glyphIndex, FT_LOAD_DEFAULT);
+    FT_Render_Glyph(fontFace->glyph, FT_RENDER_MODE_NORMAL);
+
+    if (col + fontFace->glyph->bitmap.width + padding >= 512)
+    {
+      col = padding;
+      row += fontSize;
+    }
+
+    for (unsigned int y = 0; y < fontFace->glyph->bitmap.rows; ++y)
+    {
+      for (unsigned int x = 0; x < fontFace->glyph->bitmap.width; ++x)
+      {
+        textureBuffer[(row + y) * textureWidth + col + x] =
+            fontFace->glyph->bitmap.buffer[y * fontFace->glyph->bitmap.width + x];
+      }
+    }
+
+    Glyph* glyph = &renderData->glyphs[glyphIdx];
+    glyph->textureCoords = 
+    {
+      (float)col, 
+      (float)row
+    };
+    glyph->size = 
+    { 
+      (float)fontFace->glyph->bitmap.width, 
+      (float)fontFace->glyph->bitmap.rows 
+    };
+    glyph->advance = 
+    {
+      (float)(fontFace->glyph->advance.x >> 6), 
+      (float)(fontFace->glyph->advance.y >> 6)
+    };
+    glyph->offset =
+    {
+      (float)fontFace->glyph->bitmap_left,
+      (float)fontFace->glyph->bitmap_top,
+    };
+
+    col += fontFace->glyph->bitmap.width + padding;
+  }
+
+  FT_Done_Face(fontFace);
+  FT_Done_FreeType(fontLibrary);
+
+  // Upload OpenGL Texture
+  {
+    glGenTextures(1, (GLuint*)&glContext.fontAtlasID);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, glContext.fontAtlasID);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, textureWidth, textureWidth, 0, 
+                 GL_RED, GL_UNSIGNED_BYTE, (char*)textureBuffer);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  }
+}
+
+// #############################################################################
+//                           OpenGL Functions
+// #############################################################################
 static void APIENTRY gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum severity,
                                          GLsizei length, const GLchar* message, const void* user)
 {
-  if(severity == GL_DEBUG_SEVERITY_MEDIUM ||
+  if(severity == GL_DEBUG_SEVERITY_LOW || 
+     severity == GL_DEBUG_SEVERITY_MEDIUM ||
      severity == GL_DEBUG_SEVERITY_HIGH)
   {
     SM_ASSERT(0, "OpenGL Error: %s", message);
+  }
+  else
+  {
+    SM_TRACE((char*)message);
   }
 }
 
@@ -32,49 +137,80 @@ bool gl_init(BumpAllocator* transientStorage)
 
   glDebugMessageCallback(&gl_debug_callback, 0);
   glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+  glEnable(GL_DEBUG_OUTPUT);
 
   int vertShaderID = glCreateShader(GL_VERTEX_SHADER);
   int fragShaderID = glCreateShader(GL_FRAGMENT_SHADER);
 
   int fileSize = 0;
+  char* shaderHeader = read_file("src/shader_header.h", &fileSize, transientStorage);
   char* vertShaderSource = read_file("assets/shaders/quad.vert", &fileSize, transientStorage);
+  char* fragShaderSource = read_file("assets/shaders/quad.frag", &fileSize, transientStorage);
+
+  if(!shaderHeader)
+  {
+    SM_ASSERT(0, "Failed to load Shader Header: %s", "src/shader_header.h");
+    return false;
+  }
+
   if(!vertShaderSource)
   {
     SM_ASSERT(0, "Failed to load Shader: %s", "assets/shaders/quad.vert");
     return false;
   }
-  glShaderSource(vertShaderID, 1, &vertShaderSource, &fileSize);
-  glCompileShader(vertShaderID);
 
-  // Validate if the Shader works
-  {
-    int success;
-    char shaderLog[1024] = {};
-    glGetShaderiv(vertShaderID, GL_COMPILE_STATUS, &success);
-    if(!success)
-    {
-      glGetShaderInfoLog(vertShaderID, 1024, 0, shaderLog);
-      SM_ASSERT(0, "Failed to compile shader: %s", shaderLog);
-    }
-  }
-
-  char* fragShaderSource = read_file("assets/shaders/quad.frag", &fileSize, transientStorage);
   if(!fragShaderSource)
   {
     SM_ASSERT(0, "Failed to load Shader: %s", "assets/shaders/quad.frag");
     return false;
   }
-  glShaderSource(fragShaderID, 1, &fragShaderSource, &fileSize);
-  glCompileShader(fragShaderID);
-  // Validate if the Shader works
+
+  // Vertex Shader 
   {
-    int success;
-    char shaderLog[1024] = {};
-    glGetShaderiv(fragShaderID, GL_COMPILE_STATUS, &success);
-    if(!success)
+    char* shaderSources[] =
     {
-      glGetShaderInfoLog(fragShaderID, 1024, 0, shaderLog);
-      SM_ASSERT(0, "Failed to compile shader: %s", shaderLog);
+      "#version 430 core\n",
+      shaderHeader,
+      vertShaderSource
+    };
+
+    glShaderSource(vertShaderID, ArraySize(shaderSources), shaderSources, 0);
+    glCompileShader(vertShaderID);
+
+    // Validate if the Shader works
+    {
+      int success;
+      char shaderLog[1024] = {};
+      glGetShaderiv(vertShaderID, GL_COMPILE_STATUS, &success);
+      if(!success)
+      {
+        glGetShaderInfoLog(vertShaderID, 1024, 0, shaderLog);
+        SM_ASSERT(0, "Failed to compile shader: %s", shaderLog);
+      }
+    }
+  }
+
+  // Fragment Shader
+  {
+    char* shaderSources[] =
+    {
+      "#version 430 core\r\n",
+      shaderHeader,
+      fragShaderSource
+    };
+
+    glShaderSource(fragShaderID, ArraySize(shaderSources), shaderSources, 0);
+    glCompileShader(fragShaderID);
+    // Validate if the Shader works
+    {
+      int success;
+      char shaderLog[1024] = {};
+      glGetShaderiv(fragShaderID, GL_COMPILE_STATUS, &success);
+      if(!success)
+      {
+        glGetShaderInfoLog(fragShaderID, 1024, 0, shaderLog);
+        SM_ASSERT(0, "Failed to compile shader: %s", shaderLog);
+      }
     }
   }
 
@@ -146,6 +282,11 @@ bool gl_init(BumpAllocator* transientStorage)
     stbi_image_free(data);
   }
 
+  // Load Font Atlas
+  {
+    load_font("assets/fonts/AtariClassic-gry3.ttf", 8);
+  }
+
   glUseProgram(glContext.programID);
 
   // sRGB output (even if input texture is non-sRGB -> don't rely on texture used)
@@ -190,12 +331,14 @@ void gl_render()
   // Calculate projection matrix for 2D
   {
     OrthographicCamera2D camera = renderData->camera;
-    Vec2 dimensions = camera.dimensions * (1.0f / camera.zoom? camera.zoom : 1.0f);
+    float zoom = camera.zoom? camera.zoom : 1.0f;
+    Vec2 dimensions = camera.dimensions * 1.0f / zoom;
+    Vec2 position = camera.position * (float)max((int)(1.0f / zoom), 1);
     Mat4 projectionMatrix = 
-      orthographic_projection( camera.position.x - dimensions.x / 2.0f, 
-                               camera.position.x + dimensions.x / 2.0f, 
-                               -camera.position.y - dimensions.y / 2.0f, 
-                               -camera.position.y + dimensions.y / 2.0f);
+      orthographic_projection(position.x - dimensions.x / 2.0f, 
+                              position.x + dimensions.x / 2.0f, 
+                              position.y - dimensions.y / 2.0f, 
+                              position.y + dimensions.y / 2.0f);
 
     glUniformMatrix4fv(glContext.projectionID, 1, GL_FALSE, 
                       &projectionMatrix.ax);

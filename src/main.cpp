@@ -1,5 +1,6 @@
 #include "schnitzel_lib.h"
 #include "input.h"
+#include "ui.h"
 #include "game.h"
 #include "sound.h"
 #include "render_interface.h"
@@ -8,7 +9,6 @@
 #define APIENTRY
 #define GL_GLEXT_PROTOTYPES // This is so we get the function declarations
 #include "glcorearb.h"
-
 
 // #############################################################################
 //                           Platform defines
@@ -86,6 +86,8 @@ int main()
   // Defiend in "input.h"
   input = (Input*)bump_alloc(&persistentStorage, sizeof(Input));
 
+  uiState = (UIState*)bump_alloc(&persistentStorage, sizeof(UIState));
+
   // Defines in "sound.h"
   soundState = (SoundState*)bump_alloc(&persistentStorage, sizeof(SoundState));
   soundState->transientStorage = &transientStorage;
@@ -93,8 +95,8 @@ int main()
   // Allocating Data for Sounds
   soundState->allocatedsoundsBuffer = bump_alloc(&persistentStorage, SOUNDS_BUFFER_SIZE);
 
-  if(!platform_create_window(ROOM_SIZE.x * TILESIZE * worldScale, 
-                             ROOM_SIZE.y * TILESIZE * worldScale, 
+  if(!platform_create_window(ROOM_WIDTH * worldScale, 
+                             ROOM_HEIGHT * worldScale, 
                              "Schnitzel Motor"))
   {
     SM_ERROR("Failed to create Windows Window");
@@ -115,7 +117,7 @@ int main()
     return -1;
   }
 
-  platform_set_vsync(false);
+  platform_set_vsync(true);
 
   while(running)
   {
@@ -128,7 +130,10 @@ int main()
     // Load the update_game function pointer from the DLL
     platform_reload_dynamic_library();
     platform_update_window();
-    update_game(gameState, input, renderData, soundState, dt);
+    input->cameraLocalPos = { input->mousePosWorld.x - renderData->camera.dimensions.x / 2.0f,
+                            -input->mousePosWorld.y + renderData->camera.dimensions.y / 2.0f};
+
+    update_game(gameState, input, renderData, soundState, uiState, &transientStorage, dt);
     gl_render();
 
     // This is platform specific!
@@ -141,9 +146,9 @@ int main()
 
 void update_game(GameState* gameState, Input* inputIn, 
                  RenderData* renderDataIn, SoundState* soundStateIn,
-                 double dt)
+                 UIState* uiStateIn, BumpAllocator* transientStorageIn, double dt)
 {
-  update_game_ptr(gameState, inputIn, renderDataIn, soundStateIn, dt);
+  update_game_ptr(gameState, inputIn, renderDataIn, soundStateIn, uiStateIn, transientStorageIn, dt);
 }
 
 // #############################################################################

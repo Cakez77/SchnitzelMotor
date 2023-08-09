@@ -261,15 +261,6 @@ bool platform_create_window(int width, int height, char* title)
   // (WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX)
   int dwStyle = WS_OVERLAPPEDWINDOW;
 
-  // Add Border Size of the window
-  {
-    RECT borderRect = {};
-    AdjustWindowRectEx(&borderRect, dwStyle, 0, exStyle);
-
-    width += borderRect.right - borderRect.left;
-    height += borderRect.bottom - borderRect.top;
-  }
-
   PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB;
   PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB;
   // Windows specific OpenGL function loading
@@ -353,6 +344,15 @@ bool platform_create_window(int width, int height, char* title)
 
   // Setup window and initialize Windows specific OpenGL
   {
+    // Add Border Size of the window
+    {
+      RECT borderRect = {};
+      AdjustWindowRectEx(&borderRect, dwStyle, 0, exStyle);
+
+      width += borderRect.right - borderRect.left;
+      height += borderRect.bottom - borderRect.top;
+    }
+
     window = CreateWindowExA(exStyle,
                             title,       // Class Name, reference window class
                             title,       // acutal Title
@@ -420,6 +420,7 @@ bool platform_create_window(int width, int height, char* title)
       WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
       WGL_CONTEXT_MINOR_VERSION_ARB, 3,
       WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+      WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
       0 // Terminate the Array
     };
 
@@ -580,7 +581,6 @@ void platform_update_audio(float dt)
         xAudioVoice* possibleVoice = &voiceArr[voiceIdx];
         if(!possibleVoice->playing)
         {
-          SM_TRACE("Found Voice to play Sound: %d", voiceIdx);
           voice = possibleVoice;
           break;
         }

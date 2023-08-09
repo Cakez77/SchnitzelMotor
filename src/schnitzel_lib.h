@@ -25,6 +25,8 @@ static constexpr int SAMPLE_RATE = 44100;
 #define MB(x) ((unsigned long long)1024 * KB(x))
 #define GB(x) ((unsigned long long)1024 * MB(x))
 
+#define line_id(index) (size_t)((__LINE__ << 16) | (index))
+
 #define ArraySize(x) (sizeof((x)) / sizeof((x)[0]))
 
 #ifdef _WIN32
@@ -139,11 +141,69 @@ float max(float a, float b)
   return (a > b)? a : b;
 }
 
+int min(int a, int b)
+{
+  return (a < b)? a : b;
+}
+
+int max(int a, int b)
+{
+  return (a > b)? a : b;
+}
+
+float clamp(float x, float min, float max)
+{
+  if(x < min)
+  {
+    return min;
+  }
+
+  if(x > max)
+  {
+    return max;
+  }
+
+  return x;
+}
+
+int clamp(int x, int min, int max)
+{
+  if(x < min)
+  {
+    return min;
+  }
+
+  if(x > max)
+  {
+    return max;
+  }
+
+  return x;
+}
+
+// speed = 10
+// targetSpeed = 100
+// speedUP = 12
+// speed < targetSpeed? -> speed += speedUp
+
+
+// speed 200
+// targetSpeed = 100
+// speedUp = 12
+// speed > targetSpeed? -> speed -= speedUp
+
+// speed 100
+// targetSpeed = -5
+// speedUp = 12
+// speed > targetSpeed? -> speed -= speedUp
+
 float approach(float current, float target, float increase)
 {
-  return current < target? 
-    min(current + increase, target) : 
-    max(current - increase, target);
+  if(current < target)
+  {
+    return min(current + increase, target);
+  }
+  return max(current - increase, target);
 }
 
 int sign(int x)
@@ -198,6 +258,11 @@ Vec2 operator-(Vec2 a, Vec2 b)
   return Vec2{a.x - b.x, a.y - b.y};
 }
 
+Vec2 operator-(Vec2 a, float scalar)
+{
+  return Vec2{a.x - scalar, a.y - scalar};
+}
+
 bool operator==(Vec2 a, Vec2 b)
 {
   return a.x == b.x && a.y == b.y;
@@ -218,6 +283,11 @@ IVec2 operator/(IVec2 a, float scalar)
 {
   return IVec2{(int)((float)a.x / scalar), 
                (int)((float)a.y / scalar)};
+}
+
+IVec2 operator/(IVec2 a, IVec2 b)
+{
+  return IVec2{a.x / b.x, a.y / b.y};
 }
 
 IVec2 operator-(IVec2 a, IVec2 b)
@@ -308,6 +378,22 @@ struct IRect
   IVec2 pos;
   IVec2 size;
 };
+
+bool point_in_rect(Vec2 point, Rect rect)
+{
+  return (point.x >= rect.pos.x &&
+          point.x <= rect.pos.x + rect.size.x &&
+          point.y >= rect.pos.y &&
+          point.y <= rect.pos.y + rect.size.y);
+}
+
+bool point_in_rect(Vec2 point, IRect rect)
+{
+  return (point.x >= rect.pos.x &&
+          point.x <= rect.pos.x + rect.size.x &&
+          point.y >= rect.pos.y &&
+          point.y <= rect.pos.y + rect.size.y);
+}
 
 bool rect_collision(IRect a, IRect b)
 {
@@ -500,6 +586,196 @@ Mat4 orthographic_projection(float left, float right, float top, float bottom)
 }
 
 // #############################################################################
+//                           Easing Functions
+// #############################################################################
+float ease_out_linear(float t)
+{
+  if(t < 1.0f)
+  {
+    return t;
+  }
+  else
+  {
+    return 1.0f;
+  }
+}
+
+float ease_in_quad(float t)
+{
+  if (t < 1.0f)
+  {
+    return t * t;
+  }
+  else
+  {
+    return 1.0f;
+  }
+}
+
+float ease_out_quad(float t)
+{
+  if (t < 1.0f)
+  {
+    return 1.0f - (1.0f - t) * (1.0f - t);
+  }
+  else
+  {
+    return 1.0f;
+  }
+}
+
+float ease_in_qubic(float t)
+{
+  if (t < 1.0f)
+  {
+    return t * t * t * t;
+  }
+  else
+  {
+    return 1.0f;
+  }
+}
+
+float ease_out_qubic(float t)
+{
+  if (t < 1.0f)
+  {
+    return 1.0f - (1.0f - t) * (1.0f - t) * (1.0f - t) * (1.0f - t);
+  }
+  else
+  {
+    return 1.0f;
+  }
+}
+
+float ease_in_out_qubic(float t)
+{
+  if (t < 1.0f)
+  {
+    return t < 0.5f ? 4.0f * t * t * t : 1 - (float)pow(-2 * t + 2, 3) / 2.0f;
+  }
+  else
+  {
+    return 1.0f;
+  }
+}
+
+float ease_wind_slash(float t)
+{
+  if (t < 1.0f)
+  {
+    return 1.0f - (float)pow(-2 * (t) + 2, 5) / 33.0f;
+  }
+  else
+  {
+    return 1.0f;
+  }
+}
+
+float ease_arrow(float t)
+{
+  if (t < 1.0f)
+  {
+    return t <= 0.3f ? 16.0f * t * t * t : 1 - (float)pow(-2 * (t + 0.111) + 2, 5) / 4.0f;
+  }
+  else
+  {
+    return 1.0f;
+  }
+}
+
+float ease_in_expo(float t)
+{
+  if (t < 1.0f)
+  {
+    return (float)pow(2, 8 * t - 8);
+  }
+  else
+  {
+    return 1.0f;
+  }
+}
+
+float ease_out_expo(float t)
+{
+  if (t < 1.0f)
+  {
+    return 1.0f - (float)pow(2, -10 * t);
+  }
+  else
+  {
+    return 1.0f;
+  }
+}
+
+float ease_out_quint(float t)
+{
+  if(t < 1.0f)
+  {
+    return 1.0f - pow(1.0f - t, 5.0f);
+  }
+  else
+  {
+    return 1.0f;
+  }
+}
+
+float ease_in_circ(float t)
+{
+  if (t < 1.0f)
+  {
+    return 1.0f - sqrt(1 - t * t);
+  }
+  else
+  {
+    return 1.0f;
+  }
+}
+
+float ease_out_elastic(float t)
+{
+  float c4 = (2.0f * 3.14f) / 3.0f;
+  
+  if (t == 0.0f)
+  {
+    return 0.0f;
+  }
+  else if (t < 1.0f)
+  {
+    return (float)pow(2, -10 * t) * sinf((t * 10.0f - 0.75f) * c4) + 1.0f;
+  }
+  else
+  {
+    return 1.0f;
+  }
+}
+
+float ease_out_back(float t)
+{
+  float c1 = 1.70158f;
+  float c3 = c1 + 1.0f;
+  if (t < 1.0f)
+  {
+    return 1.0f + c3 * powf(t - 1.0f, 3.0f) + c1 * powf(t - 1.0f, 2.0f);
+  }
+  else
+  {
+    return 1.0f;
+  }
+}
+
+float superku_function(float t)
+{
+  if(t > 1.0f)
+  {
+    return 1.0f;
+  }
+  
+  return 0.5f * (sqrt(t) + t * t * t * t *t );
+}
+
+
+// #############################################################################
 //                           Memeory Management
 // #############################################################################
 struct BumpAllocator
@@ -545,6 +821,23 @@ char* bump_alloc(BumpAllocator* allocator, size_t size)
   }
 
   return result;
+}
+
+// #############################################################################
+//                           String Stuff
+// #############################################################################
+template <typename... Args>
+char* format_text(char* format, Args... args)
+{
+  static int bufferIdx = 0;
+  static char buffers[2][1024] = {};
+  
+  char* buffer = buffers[bufferIdx];
+  memset(buffer, 0, 1024);
+  
+  sprintf(buffer, format, args...);
+  
+  return buffer;
 }
 
 // #############################################################################
@@ -599,13 +892,27 @@ char* read_file(char* filePath, int* fileSize, char* buffer)
   *fileSize = ftell(file);
   fseek(file, 0, SEEK_SET);
 
-  // Terminate the String
   memset(buffer, 0, *fileSize + 1);
   fread(buffer, sizeof(char), *fileSize, file);
 
   fclose(file);
 
   return buffer;
+}
+
+void write_file(char* filePath, char* buffer, int size)
+{
+  SM_ASSERT(filePath, "No filePath supplied!");
+  SM_ASSERT(buffer, "No buffer supplied!");
+  auto file = fopen(filePath, "wb");
+  if(!file)
+  {
+    SM_ERROR("Failed opening File: %s", filePath);
+    return;
+  }
+
+  fwrite(buffer, sizeof(char), size, file);
+  fclose(file);
 }
 
 char* read_file(char* filePath, int* fileSize, BumpAllocator* bumpAllocator)

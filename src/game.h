@@ -1,5 +1,6 @@
 
 #include "schnitzel_lib.h"
+#include "ui.h"
 #include "input.h"
 #include "render_interface.h"
 #include "sound.h"
@@ -10,8 +11,14 @@
 constexpr int UPDATES_PER_SECOND = 60;
 constexpr double UPDATE_DELAY = 1.0 / UPDATES_PER_SECOND;
 constexpr int TILESIZE = 8;
-constexpr IVec2 ROOM_SIZE = {320 / TILESIZE, 180 / TILESIZE};
-constexpr IVec2 WORLD_SIZE = {320 / TILESIZE, 540 / TILESIZE};
+constexpr int WORLD_HEIGHT = 180 * 3;
+constexpr int WORLD_WIDTH = 320;
+constexpr int ROOM_HEIGHT = 180;
+constexpr int ROOM_WIDTH = WORLD_WIDTH;
+
+// In number of tiles
+constexpr IVec2 ROOM_SIZE = {ROOM_WIDTH / TILESIZE, ROOM_HEIGHT / TILESIZE};
+constexpr IVec2 WORLD_SIZE = {WORLD_WIDTH / TILESIZE, WORLD_HEIGHT / TILESIZE};
 
 // #############################################################################
 //                           Game Structs
@@ -49,25 +56,95 @@ struct Tile
   int neighbourMask;
 };
 
-struct GameState
+enum AnimationState
 {
-  double updateTimer;
-  IVec2 playerPos;
-  IVec2 prevPlayerPos;
-  b8 initialized = false;
-  GameInput gameInput[GAME_INPUT_COUNT];
-  Sound jumpSound;
-  Sound deathSound;
-  OrthographicCamera2D camera;
+  ANIMATION_STATE_IDLE,
+  ANIMATION_STATE_JUMP,
+  ANIMATION_STATE_RUN,
+
+  ANIMATION_STATE_COUNT
+};
+
+struct Player
+{
+  IVec2 pos;
+  IVec2 prevPos;
+  Vec2 solidSpeed;
+  int renderOptions;
+  float deathAnimTimer;
+  float runAnimTimer;
+  AnimationState animationState;
+  SpriteID animationSprites[ANIMATION_STATE_COUNT]; 
+};
+
+struct Tileset
+{
+  Array<IVec2, 21> tileCoords;
+};
+
+struct Keyframe
+{
+  IVec2 pos;
+  float time; // how long to get there
+};
+
+struct Solid
+{
+  SpriteID spriteID;
+
+  // Pixel Movement
+  Vec2 prevRemainder;
+  Vec2 remainder;
+
+  // Used by "interpolated rendering"
+  IVec2 prevPos;
+  IVec2 pos;
+
+  int keyframeIdx;
+  Array<Keyframe, 10> keyframes;
+
+  // Animation
+  float time;
+  float waitingTime;
+  float waitingDuration;
+};
+
+struct TileMap
+{
+  Tileset tileset;
   Tile tiles[WORLD_SIZE.x * WORLD_SIZE.y];
 };
 
-static int worldScale = 4;
+struct Level
+{
+  int version = 1;
+  IVec2 playerStartPos;
+  TileMap tileMap;
+  TileMap bgTileMap;
+  Array<Solid, 50> solids;
+};
+
+struct GameState
+{
+  double updateTimer;
+  bool initialized = false;
+  float cameraTimer;
+  GameInput gameInput[GAME_INPUT_COUNT];
+
+  Player player;
+  Level level;
+
+  Sound jumpSound;
+  Sound deathSound;
+};
+
+static int worldScale = 5;
 
 extern "C"
 {
   EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* renderDataIn,
-                             SoundState* soundStateIn, double frameTime);
+                             SoundState* soundStateIn, UIState* uiStateIn, 
+                             BumpAllocator* transientStorageIn, double frameTime);
 }
 
 

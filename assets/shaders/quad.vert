@@ -1,15 +1,3 @@
-#version 430
-
-const int RENDERING_OPTION_FLIP_X = (1 << 0);
-struct Transform
-{
-  vec2 pos;
-  vec2 size;
-  vec2 atlasOffset;
-  vec2 spriteSize;
-  int renderOptions;
-  int padding;
-};
 
 // Input Uniforms
 uniform vec2 screenSize;
@@ -24,6 +12,7 @@ layout(std430, binding = 0) buffer TransformSBO
 
 // Output
 layout (location = 0) out vec2 textureCoordsOut;
+layout (location = 1) out int renderOptionsOut;
 
 void main()
 {
@@ -76,6 +65,7 @@ void main()
   gl_Position = orthoProjection * vec4(vertexPos, 0.0, 1.0);
 
   textureCoordsOut = textureCoords[gl_VertexID];
+  renderOptionsOut = t.renderOptions;
 }
 
 

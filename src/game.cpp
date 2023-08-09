@@ -3,106 +3,55 @@
 #include "input.h"
 #include "render_interface.h"
 
+// #############################################################################
+//                           Game Constants
+// #############################################################################
 constexpr float DEATH_ANIM_TIME = 0.25f;
-// #############################################################################
-//                           Game Structs
-// #############################################################################
-  struct Keyframe
-  {
-    IVec2 pos;
-    float time; // how long to get there
-  };
-
-  struct Solid
-  {
-    // Pixel Movement
-    Vec2 prevRemainder;
-    Vec2 remainder;
-
-    // Used by "interpolated rendering"
-    IVec2 prevPos;
-    // Current pos & size
-    IRect rect;
-
-    int keyframeIdx;
-    Array<Keyframe, 10> keyframes;
-
-    // Animation
-    float time;
-    float waitingTime;
-    float waitingDuration;
-  };
-
-  struct Tileset
-  {
-    Array<Vec2, 21> tileCoords;
-  };
 
 // #############################################################################
 //                           Game Globals
 // #############################################################################
+static BumpAllocator* transientStorage;
 static GameState* gameState;
-static float xRemainder = 0.0f;
-static float yRemainder = 0.0f;
-static bool standingOnPlatform = false;
-static Vec2 speed;
-static int renderOptions;
-static float deathAnimTimer = DEATH_ANIM_TIME;
-static Tileset tileset;
-static Solid solids [] =
-{
-  {
-    // .rect = {8 * 13, 8 * 2, 8, 8 * 11},
-  },
-  {
-    // .rect = {48 *  8, 48 * 2, 48, 48 * 8}
-  },
-  {
-    .rect = {0, 8 * 13, 8 * 22, 8}
-  },
-  {
-    .rect = {8 * 5, 8 * 0, 8 * 2, 8},
-    .keyframes = 
-    {
-      .count = 5,
-      .elements =
-      {
-        {{8 * 0, 8 * 0}, 0.0f},
-        {{8 * 8, 8 * 0}, 0.5f},
-        {{8 * 5, 8 *  7}, 1.0f},
-        {{8 * 8, 8 * 0}, 1.5f},
-        {{8 * 0, 8 * 0}, 2.0f},
-      }
-    }
-  },
-};
 
 // #############################################################################
 //                           Game Functions
 // #############################################################################
+// Input
 void update_game_input(float dt);
 bool is_down(GameInputType type);
 bool just_pressed(GameInputType type);
-void update_player(float dt);
+
+// Tiles
+IVec2 get_world_pos(Vec2 mousePos);
+IVec2 get_player_coords();
+Tile* get_tile(Tile* tiles, int x, int y);
+Tile* get_tile_fg(int x, int y);
+Tile* get_tile_bg(int x, int y);
+Tile* get_tile(IVec2 worldPos);
+IVec2 get_tile_position(int x, int y);
+IRect get_tile_rect(int x, int y);
+
+// Solids
+IRect get_solid_rect(Solid solid);
+
+// Player
+int get_room_idx();
 IRect get_player_rect();
-IRect get_player_jump_rect();
+int animate(float* time, int frameCount, float loopTime = 1.0f);
+void update_player(float dt);
+
+// Disconnected Rendering and Updating
+void draw_tile_map(TileMap* tileMap);
 void draw(float interpolatedDT);
 void update();
-IVec2 get_world_pos(Vec2 mousePos)
-{
-  Vec2 localPos = mousePos / worldScale;
-  // int y = gameState->cameraPosition.y - localPos.y;
-  // int x = localPos.x - gameState->cameraPosition.x;
-  return {};
-
-  // return IVec2{x, y};
-}
 
 // #############################################################################
 //                           Update Game (Exported from DLL)
 // #############################################################################
 EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, 
                            RenderData* renderDataIn, SoundState* soundStateIn,
+                           UIState* uiStateIn, BumpAllocator* transientStorageIn,
                            double frameTime)
 {
   if(gameState != gameStateIn)
@@ -111,46 +60,111 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
     renderData = renderDataIn;
     gameState = gameStateIn;
     soundState = soundStateIn;
+    uiState = uiStateIn;
+    transientStorage = transientStorageIn;
 
     // Sounds
     char* jumpSound = "assets/sounds/jump_01.wav";
     char* deathSound = "assets/sounds/died_02.wav";
     memcpy(gameState->jumpSound.path, jumpSound, strlen(jumpSound));
     memcpy(gameState->deathSound.path, deathSound, strlen(deathSound));
-
-    tileset.tileCoords.add({192, 0});
-    tileset.tileCoords.add({200, 0});
-    tileset.tileCoords.add({208, 0});
-    tileset.tileCoords.add({216, 0});
-
-    tileset.tileCoords.add({192, 8});
-    tileset.tileCoords.add({200, 8});
-    tileset.tileCoords.add({208, 8});
-    tileset.tileCoords.add({216, 8});
-
-    tileset.tileCoords.add({192, 16});
-    tileset.tileCoords.add({200, 16});
-    tileset.tileCoords.add({208, 16});
-    tileset.tileCoords.add({216, 16});
-
-    tileset.tileCoords.add({192, 24});
-    tileset.tileCoords.add({200, 24});
-    tileset.tileCoords.add({208, 24});
-    tileset.tileCoords.add({216, 24});
-
-    // Corners
-    tileset.tileCoords.add({192, 32});
-    tileset.tileCoords.add({200, 32});
-    tileset.tileCoords.add({208, 32});
-    tileset.tileCoords.add({216, 32});
-
-    // Black inside
-    tileset.tileCoords.add({192, 40});
   }
 
   if(!gameState->initialized)
   {
+    // Player
+    gameState->player.animationSprites [ANIMATION_STATE_IDLE] = SPRITE_CELESTE_01;
+    gameState->player.animationSprites [ANIMATION_STATE_JUMP] = SPRITE_CELESTE_01_JUMP;
+    gameState->player.animationSprites [ANIMATION_STATE_RUN] = SPRITE_CELESTE_01_RUN;
+    gameState->player.deathAnimTimer = DEATH_ANIM_TIME;
+    gameState->level.playerStartPos = {0, 4 * 8};
+    gameState->player.pos = gameState->level.playerStartPos;
+
+    // Solids
+    {
+      gameState->level.solids.add(
+      {
+        .spriteID = SPRITE_SOLID_01,
+        .pos = {2 * 8,  10 * 8}
+      });
+      gameState->level.solids.add(
+      {
+        .spriteID = SPRITE_SOLID_01,
+        .pos = {0 * 8, 10 * 8},
+        .keyframes = 
+        {
+          .count = 3,
+          .elements =
+          {
+            {{8 * 0, 10 * 8}, 0.0f},
+            {{8 * 8, 10 * 8}, 0.5f},
+            {{8 * 0, 10 * 8}, 1.0f},
+            // {{8 * 0, 8 * 0}, 2.0f},
+          }
+        }
+      });
+      gameState->level.solids.add(
+      {
+        .spriteID = SPRITE_SOLID_02,
+        .pos = {-5 * 8, 10 * 8},
+        .keyframes = 
+        {
+          .count = 3,
+          .elements =
+          {
+            {{-5 * 8, 10 * 8}, 0.0f},
+            {{ 0 * 8, 10 * 8}, 0.5f},
+            {{-5 * 8, 10 * 8}, 1.0f},
+            // {{8 * 0, 8 * 0}, 2.0f},
+          }
+        }
+      });
+    }
+
+    // Foreground Tileset
+    {
+      Tileset* tileset = &gameState->level.tileMap.tileset;
+      IVec2 tilesPosition = {192, 0};
+      for(int y = 0; y < 5; y++)
+      {
+        for(int x = 0; x < 4; x++)
+        {
+          tileset->tileCoords.add({tilesPosition.x +  x * 8, 
+                                   tilesPosition.y + y * 8});
+        }
+      }
+
+      // Black inside
+      tileset->tileCoords.add({tilesPosition.x, 
+                               tilesPosition.y + 5 * 8});
+    }
+
+    // Background Tileset
+    {
+      Tileset* tileset = &gameState->level.bgTileMap.tileset;
+      IVec2 tilesPosition = {192, 48};
+      for(int y = 0; y < 5; y++)
+      {
+        for(int x = 0; x < 4; x++)
+        {
+          tileset->tileCoords.add({tilesPosition.x +  x * 8, 
+                                   tilesPosition.y + y * 8});
+        }
+      }
+
+      // Black inside
+      tileset->tileCoords.add({tilesPosition.x, 
+                               tilesPosition.y + 5 * 8});
+    }
+
+    // Camera
+    renderData->camera.position.y = -90.0f;
     renderData->camera.zoom = 1.0f;
+    renderData->camera.dimensions.x = ROOM_WIDTH;
+    renderData->camera.dimensions.y = ROOM_HEIGHT;
+    renderData->camera.zoom = 1.0f;
+    gameState->cameraTimer = 1.0f;
+
     gameState->initialized = true;
   }
 
@@ -173,7 +187,7 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
 }
 
 // #############################################################################
-//                           Implementations
+//                           Implementations Input
 // #############################################################################
 void update_game_input(float dt)
 {
@@ -213,10 +227,8 @@ void update_game_input(float dt)
   // Dashing
   gameState->gameInput[INPUT_DASH].justPressed  = input->keys[KEY_Q].justPressed;
   gameState->gameInput[INPUT_DASH].justPressed  = input->keys[KEY_E].justPressed;
-  gameState->gameInput[INPUT_DASH].justPressed  = input->keys[KEY_K].justPressed;
   gameState->gameInput[INPUT_DASH].justPressed |= input->keys[KEY_Q].justPressed;
   gameState->gameInput[INPUT_DASH].justPressed |= input->keys[KEY_E].justPressed;
-  gameState->gameInput[INPUT_DASH].justPressed |= input->keys[KEY_K].justPressed;
 }
 
 bool is_down(GameInputType type)
@@ -229,47 +241,100 @@ bool just_pressed(GameInputType type)
   return gameState->gameInput[type].justPressed;
 }
 
-void update_player(float dt)
+// #############################################################################
+//                           Implementations Tiles
+// #############################################################################
+IVec2 get_world_pos(Vec2 mousePos)
 {
+  Vec2 localPos = mousePos / worldScale;
+  localPos.x += renderData->camera.position.x;
+  return ivec_2(localPos);
+}
 
+IVec2 get_player_coords()
+{
+  // return {gameState->player.pos
+  return {};
+}
+
+Tile* get_tile(Tile* tiles, int x, int y)
+{
+  if(x < 0 || x >= WORLD_SIZE.x || y < 0 || y >= WORLD_SIZE.y) return nullptr;
+  return &tiles[y * WORLD_SIZE.x + x];
+}
+
+Tile* get_tile_fg(int x, int y)
+{
+  return get_tile(gameState->level.tileMap.tiles, x, y);
+}
+
+Tile* get_tile_bg(int x, int y)
+{
+  return get_tile(gameState->level.bgTileMap.tiles, x, y);
+}
+
+Tile* get_tile(IVec2 worldPos)
+{
+  int roomIdx = get_room_idx();
+  int x = worldPos.x / TILESIZE;
+  int y = ROOM_SIZE.y - worldPos.y / TILESIZE + ROOM_SIZE.y * roomIdx;
+
+  SM_TRACE("X: %d, Y: %d", x, y);
+  SM_TRACE("Player Pos: X: %d, Y: %d", gameState->player.pos.x, 
+                                       gameState->player.pos.y);
+
+  if(key_is_down(KEY_CONTROL))
+  {
+    return get_tile_bg(x, y);
+  }
+
+  return get_tile_fg(x, y);
+}
+
+IVec2 get_tile_position(int x, int y)
+{
+  return IVec2{x * TILESIZE - ROOM_WIDTH / 2 + TILESIZE / 2, 
+               y * TILESIZE};
+}
+
+IRect get_tile_rect(int x, int y)
+{
+  IVec2 tilePos = get_tile_position(x, y);
+  return {tilePos.x - TILESIZE / 2, tilePos.y + TILESIZE / 2, TILESIZE, TILESIZE};
+}
+
+// #############################################################################
+//                           Implementations Solids
+// #############################################################################
+IRect get_solid_rect(Solid solid)
+{
+  Sprite sprite = get_sprite(solid.spriteID);
+  return {solid.pos.x - sprite.size.x / 2, 
+          solid.pos.y - 1, sprite.size};
+}
+
+// #############################################################################
+//                           Implementations Player
+// #############################################################################
+int get_room_idx()
+{
+  int roomIdx = gameState->player.pos.y / 180;
+  roomIdx = clamp(roomIdx, 0, WORLD_HEIGHT / ROOM_HEIGHT - 1);
+  return roomIdx;
 }
 
 IRect get_player_rect()
 {
   return 
   {
-    gameState->playerPos.x + 6, 
-    gameState->playerPos.y + 2, 
+    gameState->player.pos.x - 4, 
+    gameState->player.pos.y, 
     8, 
     16
   };
 }
 
-Tile* get_tile(int x, int y)
-{
-  if(x < 0 || x >= WORLD_SIZE.x || y < 0 || y >= WORLD_SIZE.y) return nullptr;
-  return &gameState->tiles[y * WORLD_SIZE.x + x];
-}
-
-Tile* get_tile(Vec2 worldPos)
-{
-  int x = worldPos.x / TILESIZE;
-  int y = (worldPos.y + (WORLD_SIZE.y - gameState->camera.position.y)) / TILESIZE;
-
-  SM_TRACE("X: %d, Y: %d", x, y);
-
-  return get_tile(x, y);
-}
-
-Tile* get_tile2(IVec2 worldPos)
-{
-  int x = worldPos.x / TILESIZE;
-  int y = worldPos.y / TILESIZE;
-
-  return get_tile(x, y);
-}
-
-int animate(float* time, int frameCount, float loopTime = 1.0f)
+int animate(float* time, int frameCount, float loopTime)
 {
   if(*time > loopTime)
   {
@@ -285,468 +350,165 @@ int animate(float* time, int frameCount, float loopTime = 1.0f)
   return animationIdx;
 }
 
-void draw(float interpDT)
+void update_player(float dt)
 {
-  draw_sprite(SPRITE_CELESTE_01, {0, 0}, worldScale);
-  // IRect playerCollider = get_player_rect();
-  // draw_quad(playerCollider.pos * worldScale, playerCollider.size * worldScale);
-  // renderData->cameraPos.y = (get_current_room_idx() * 180) * worldScale;
-  // SM_TRACE("Current Room Idx: %d", get_current_room_idx());
-
-  Vec2 playerPos = lerp(vec_2(gameState->prevPlayerPos), 
-                        vec_2(gameState->playerPos), 
-                        interpDT);
-
-  // Death Animation
-  if(deathAnimTimer < DEATH_ANIM_TIME)
-  {
-    Sprite sprite = get_sprite(SPRITE_CELESTE_DEATH);
-    float t = deathAnimTimer;
-    int animationIdx = animate(&t, sprite.frameCount, DEATH_ANIM_TIME);
-
-    Transform transform = {};
-    transform.atlasOffset = vec_2(sprite.atlasOffset);
-    transform.atlasOffset.x += (float)(animationIdx * sprite.size.x);
-    transform.pos = playerPos * worldScale;
-    transform.size = Vec2{32.0f * worldScale, 32.0f * worldScale};
-    transform.spriteSize = Vec2{32.0f, 32.0f};
-
-    draw_quad(transform);
-  }
-  else
-  {  
-    if(speed.x > 0)
-    {
-      renderOptions = 0;
-    }
-    if(speed.x < 0)
-    {
-      renderOptions |= RENDERING_OPTION_FLIP_X ;
-    }
-    draw_sprite(SPRITE_CELESTE_01, playerPos * worldScale, worldScale, renderOptions);
-  }
-
-  // Tiles
-  {
-    // Neighbouring Tiles       Top    Left  Right Bottom  
-    int neighbourOffsets[24] = { 0,-1,  -1,0,  1,0,  0,1,   
-    //                         Topleft Topright Bottomleft Bottomright
-                                -1,-1,   1,-1,     -1,1,      1,1,
-    //                          Top2   Left2  Right2 Bottom2
-                                 0,-2,  -2,0,  2,0,  0,2};
-
-    // Topleft     = BIT(4) = 16
-    // Toplright   = BIT(5) = 32
-    // Bottomleft  = BIT(6) = 64
-    // Bottomright = BIT(7) = 128
-
-    for(int x = 0; x < WORLD_SIZE.x; x++)
-    {
-      for(int y = 0; y < WORLD_SIZE.y; y++)
-      {
-        Tile* tile = get_tile(x, y);
-
-        if(!tile->type)
-        {
-          continue;
-        }
-
-
-        if(tile->type == TILE_TYPE_SPIKE)
-        {
-          draw_sprite(SPRITE_SPIKE, 
-                      {float(x * TILESIZE * worldScale), 
-                      float(y * TILESIZE * worldScale)}, worldScale);
-
-          continue;
-        }
-
-        // Reset mask every frame
-        tile->neighbourMask = 0;
-        int neighbourCount = 0;
-        int extendedNeighbourCount = 0;
-        int emptyNeighbourSlot = 0;
-
-        // Look at all 4 Neighbours
-        for(int n = 0; n < 12; n++) 
-        {
-          Tile* neighbour = get_tile(x + neighbourOffsets[n * 2],
-                                     y + neighbourOffsets[n * 2 + 1]);
-
-
-          if(!neighbour || neighbour->type == TILE_TYPE_SOLID)
-          {
-            tile->neighbourMask |= BIT(n);
-            if(n < 8)
-            {
-              neighbourCount++;
-            }
-            else
-            {
-              extendedNeighbourCount++;
-            }
-          }
-          else if(n < 8)
-          { 
-            emptyNeighbourSlot = n;
-          }
-        }
-
-        if(neighbourCount == 7 && emptyNeighbourSlot >= 4) // We have a corner
-        {
-          tile->neighbourMask = 16 + (emptyNeighbourSlot - 4);
-        }
-        else if(neighbourCount == 8 && extendedNeighbourCount == 4)
-        {
-          tile->neighbourMask = 20;
-        }
-        else
-        {
-          tile->neighbourMask = tile->neighbourMask & 0b1111;
-        }
-
-        // Draw Tile
-        Transform transform = {};
-        transform.pos = Vec2{float(x * TILESIZE * worldScale), 
-                             float((-540.0f + y * TILESIZE) * worldScale)};
-        transform.size = Vec2{8.0f * worldScale, 8.0f * worldScale};
-        transform.spriteSize = Vec2{8.0f, 8.0f};
-        transform.atlasOffset = tileset.tileCoords[tile->neighbourMask];
-        draw_quad(transform);
-      }
-    }
-  }
-
-  for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
-  {
-    Solid solid = solids[solidIdx];
-    Vec2 solidPos = lerp(vec_2(solid.prevPos), 
-                         vec_2(solid.rect.pos), 
-                         interpDT);
-
-    draw_quad(solidPos * (float)worldScale, vec_2(solid.rect.size) * (float)worldScale);
-  }
-}
-
-void update()
-{
-  // We update the logic at a fixed rate to keep the game stable 
-  // and to save on performance
-  float dt = UPDATE_DELAY;
-  update_game_input(dt);
-
-
-  // Camera controls
-  {
-    gameState->camera.dimensions = vec_2(ROOM_SIZE);
-    renderData->camera.dimensions = gameState->camera.dimensions * worldScale;
-    renderData->camera.position = gameState->camera.position * worldScale;
-    renderData->camera.zoom = worldScale * 2.0f;
-
-    // Camera Position is a multiple of 180(Room Height)
-    {
-      int roomIdx = (gameState->playerPos.y + 90) / 180;
-      gameState->camera.position.y = 180.0f * (float)roomIdx;
-    }
-    
-
-    if(key_is_down(KEY_Z))
-    {
-      gameState->camera.zoom += dt;
-    }
-
-    if(key_is_down(KEY_T))
-    {
-      gameState->camera.zoom -= dt;
-    }
-  }
-
-  // Player specific
-  {
-    gameState->prevPlayerPos = gameState->playerPos;
-    standingOnPlatform = false;
-
-    // Death Animation
-    {
-      float prevDeathAnimTimer = deathAnimTimer;
-      deathAnimTimer  = min(DEATH_ANIM_TIME, deathAnimTimer + dt);
-      if (prevDeathAnimTimer < DEATH_ANIM_TIME && deathAnimTimer == DEATH_ANIM_TIME)
-      {
-        gameState->playerPos = {8 * 2, -4 * 8};
-      }
-    }
-  }
-
-  // Leveleditor
-  {
-    if(key_is_down(KEY_LEFT_MOUSE))
-    {
-      IVec2 worldPos = get_world_pos(input->mousePosScreen);
-
-      Tile* tile = get_tile2(worldPos);
-      if(tile)
-      {
-        if(key_is_down(KEY_SHIFT))
-        {
-          tile->type = TILE_TYPE_SPIKE;
-        }
-        else
-        {
-          tile->type = TILE_TYPE_SOLID;
-        }
-      }
-    }
-
-    if(key_is_down(KEY_RIGHT_MOUSE))
-    {
-      Tile* tile = get_tile(input->mousePosWorld);
-      if(tile)
-      {
-        tile->type = TILE_TYPE_NONE;
-      }
-    }
-  }
-
   // Movement Data needed for Celeste
   float maxRunSpeed = 2.0f;
   float wallJumpSpeed = 3.0f;
   float runAcceleration = 50.0f / 3.6f;
   float fallSideAcceleration = 35.0f / 3.6f;
   float maxJumpSpeed = 3.0f;
-  float fallSpeed = 18.0f / 3.6f;
+  float fallSpeed = -3.6f;
   float dashSpeed = 4.2f;
-  float gravity = 70.0f / 3.6f;
+  float gravity = 13.0f;
   float runReduce = 80.0f / 3.6f;
-  float wallClimbSpeed = -4.0f / 3.6f;
-  float wallSlideDownSpeed = 8.0f / 3.6f;
-  Vec2 solidSpeed = {};
-  static float highestHeight = input->screenSize.y;
-  static float varJumpTimer = 0.0f;
-  static float wallJumpTimer = 0.0f;
+  float flyReduce = 12.0f;
+  float wallClimbSpeed = 4.0f / 3.6f;
+  float wallSlideDownSpeed = -8.0f / 3.6f;
+  float directionChangeMult = 1.6f;
+
+  // Static variables that keep the state of the data
+  // Other functions don't need access to this data
+  // which is why it's here
+  static Vec2 speed;
+  static float xRemainder;
+  static float yRemainder;
+  static float varJumpTimer;
+  static float wallJumpTimer;
+  static float dashTimer;
   static bool playerGrounded = true;
   static bool grabbingWall = false;
-  static float dashTimer = 0.0f;
   static int dashCounter = playerGrounded;
 
-  for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
-  {
-    Solid* solid = &solids[solidIdx];
-    solid->prevPos = solid->rect.pos;
-    solid->prevRemainder = solid->remainder;
-
-    if(solid->keyframes.count > 1)
-    {
-      solid->time += dt;
-
-      int nextKeyframeIdx = 1;
-      
-      bool sdfkljsdfklsjkldfj = false;
-      for(int keyframeIdx = 0; keyframeIdx < solid->keyframes.count;
-          keyframeIdx++)
-      {
-        if(solid->keyframes[keyframeIdx].time > solid->time)
-        {
-          sdfkljsdfklsjkldfj = true;
-          nextKeyframeIdx = keyframeIdx;
-          break;
-        }
-      } 
-
-      if(!sdfkljsdfklsjkldfj)
-      {
-        solid->time -= solid->keyframes[solid->keyframes.count - 1].time;
-      }
-
-      int currentKeyframeIdx = nextKeyframeIdx - 1;
-      if(currentKeyframeIdx < 0)
-      {
-        currentKeyframeIdx = solid->keyframes.count - 1;
-      }
-
-      Keyframe currentKeyframe = solid->keyframes[currentKeyframeIdx];
-      Keyframe nextKeyframe  = solid->keyframes[nextKeyframeIdx];
-
-      float t = (solid->time - currentKeyframe.time) / 
-                (nextKeyframe.time - currentKeyframe.time);
-
-      Vec2 nextPos = vec_2(currentKeyframe.pos) + vec_2(nextKeyframe.pos - currentKeyframe.pos) * t;
-      float speedX = nextPos.x - (float)solid->rect.pos.x;
-      // Move X
-      {
-        float amount = speedX;
-        solid->remainder.x += amount; 
-        int move = round(solid->remainder.x);   
-        if (move != 0) 
-        { 
-          solid->remainder.x -= move; 
-          int moveSign = sign(move);
-          while (move != 0) 
-          { 
-            bool collisionHappened = false;
-
-            IRect solidRect = solids[solidIdx].rect;
-            IRect newSolidRect = solidRect;
-            newSolidRect.pos.x += moveSign;
-            IRect playerRect = get_player_rect();
-            playerRect.pos.y -= 2;
-            playerRect.size.y += 4;
-
-            // Is Celeste currently standing on this Solid,
-            // or is she getting pushed
-            if(rect_collision(playerRect, newSolidRect))
-            {
-              if(solidRect.pos.y <= playerRect.pos.y + playerRect.size.y)
-              {
-                gameState->playerPos.x += moveSign;
-                solidSpeed.x = speedX;
-              }
-                
-              for(int subSolidIdx = 0; subSolidIdx < ArraySize(solids);
-                  subSolidIdx++)
-              {
-                if(subSolidIdx == solidIdx)
-                {
-                  continue;
-                }
-
-                IRect subSolidRect = solids[subSolidIdx].rect;
-                if(rect_collision(get_player_rect(), subSolidRect))
-                {
-                  gameState->playerPos = {50, 0};
-                }
-              }
-            }
-
-            solid->rect.pos.x += moveSign; 
-            move -= moveSign; 
-          } 
-        }
-      }
-
-      // Move Y
-      float speedY = nextPos.y - (float)solid->rect.pos.y;
-      {
-        float amount = nextPos.y - (float)solid->rect.pos.y;
-        solid->remainder.y += amount; 
-        int move = round(solid->remainder.y);   
-        if (move != 0) 
-        { 
-          solid->remainder.y -= move; 
-          int moveSign = sign(move);
-          while (move != 0) 
-          { 
-            bool collisionHappened = false;
-
-            IRect solidRect = solids[solidIdx].rect;
-            IRect newSolidRect = solidRect;
-            newSolidRect.pos.x += moveSign;
-            IRect playerRect = get_player_rect();
-            playerRect.pos.y -= 2;
-            playerRect.size.y += 4;
-
-            // Is the player currently standing on this Solid
-            if(rect_collision(playerRect, newSolidRect))
-            {
-              standingOnPlatform = true;
-
-              if(solidRect.pos.y <= playerRect.pos.y + playerRect.size.y)
-              {
-                gameState->playerPos.y += moveSign;
-                solidSpeed.y = speedY;
-              }
-
-              for(int subSolidIdx = 0; subSolidIdx < ArraySize(solids);
-                  subSolidIdx++)
-              {
-                if(subSolidIdx == solidIdx)
-                {
-                  continue;
-                }
-
-                IRect subSolidRect = solids[subSolidIdx].rect;
-                if(rect_collision(get_player_rect(), subSolidRect))
-                {
-                  gameState->playerPos = {8 * 2, 8 * 2};
-                }
-              }
-            }
-
-            solid->rect.pos.y += moveSign; 
-            move -= moveSign; 
-          } 
-        } 
-      }
-    }
-  }
+  gameState->player.prevPos = gameState->player.pos;
+  gameState->player.animationState = ANIMATION_STATE_IDLE;
 
   if(key_pressed_this_frame(KEY_R))
   {
-    gameState->playerPos = {8 * 2, -8 * 4};
+    gameState->player.pos = gameState->level.playerStartPos;
   }
 
-  float directionChangeMult = 1.6f;
-  if(is_down(INPUT_MOVE_LEFT) &&
-     !is_down(INPUT_MOVE_RIGHT))
+  // Make Celeste face into the direction that she is walking in
   {
-    float mult = 1.0f;
-    if(speed.x > 0.0f)
+    if(speed.x > 0)
     {
-      mult = directionChangeMult;
+      gameState->player.renderOptions = 0;
     }
 
-    if(playerGrounded)
+    if(speed.x < 0)
     {
-      speed.x = approach(speed.x, -maxRunSpeed, runAcceleration * mult * dt);
-    }
-    else
-    {
-      speed.x = approach(speed.x, -maxRunSpeed, fallSideAcceleration * mult * dt);
-    }
-
-  }
-
-  if(is_down(INPUT_MOVE_RIGHT) &&
-     !is_down(INPUT_MOVE_LEFT))
-  {
-    float mult = 1.0f;
-    if(speed.x < 0.0f)
-    {
-      mult = directionChangeMult;
-    }
-
-    if(playerGrounded)
-    {
-      speed.x = approach(speed.x, maxRunSpeed, runAcceleration * mult * dt);
-    }
-    else
-    {
-      speed.x = approach(speed.x, maxRunSpeed, fallSideAcceleration * mult * dt);
+      gameState->player.renderOptions |= RENDERING_OPTION_FLIP_X ;
     }
   }
 
-  // friction
-  if(!is_down(INPUT_MOVE_LEFT) &&
-     !is_down(INPUT_MOVE_RIGHT))
+  // Death Animation
   {
-    speed.x = approach(speed.x, 0, runReduce * dt);
+    float prevDeathAnimTimer = gameState->player.deathAnimTimer;
+    gameState->player.deathAnimTimer  = 
+      min(DEATH_ANIM_TIME, gameState->player.deathAnimTimer + dt);
+    if (prevDeathAnimTimer < DEATH_ANIM_TIME && 
+        gameState->player.deathAnimTimer == DEATH_ANIM_TIME)
+    {
+      gameState->player.pos = gameState->level.playerStartPos;
+    }
+  }
+
+  // Running
+  {
+    if(is_down(INPUT_MOVE_LEFT) &&
+      !is_down(INPUT_MOVE_RIGHT))
+    {
+      if(!playerGrounded)
+      {
+        gameState->player.animationState = ANIMATION_STATE_JUMP;
+      }
+      else
+      {
+        gameState->player.runAnimTimer += dt;
+        gameState->player.animationState = ANIMATION_STATE_RUN;
+      }
+
+      float mult = 1.0f;
+      if(speed.x > 0.0f)
+      {
+        mult = directionChangeMult;
+      }
+
+      if(playerGrounded)
+      {
+        speed.x = approach(speed.x, -maxRunSpeed, runAcceleration * mult * dt);
+      }
+      else
+      {
+        speed.x = approach(speed.x, -maxRunSpeed, fallSideAcceleration * mult * dt);
+      }
+
+    }
+
+    if(is_down(INPUT_MOVE_RIGHT) &&
+      !is_down(INPUT_MOVE_LEFT))
+    {
+      if(!playerGrounded)
+      {
+        gameState->player.animationState = ANIMATION_STATE_JUMP;
+      }
+      else
+      {
+        gameState->player.runAnimTimer += dt;
+        gameState->player.animationState = ANIMATION_STATE_RUN;
+      }
+
+      float mult = 1.0f;
+      if(speed.x < 0.0f)
+      {
+        mult = directionChangeMult;
+      }
+
+      if(playerGrounded)
+      {
+        speed.x = approach(speed.x, maxRunSpeed, runAcceleration * mult * dt);
+      }
+      else
+      {
+        speed.x = approach(speed.x, maxRunSpeed, fallSideAcceleration * mult * dt);
+      }
+    }
+
+    // Friction
+    if(!is_down(INPUT_MOVE_LEFT) &&
+      !is_down(INPUT_MOVE_RIGHT))
+    {
+      if(playerGrounded)
+      {
+        speed.x = approach(speed.x, 0, runReduce * dt);
+      }
+      else
+      {
+        speed.x = approach(speed.x, 0, flyReduce * dt);
+      }
+    }
   }
 
   // Jumping
   {
+    draw_format_text("Solid Speed: %.2f, %.2f", {-150, 100},
+                     gameState->player.solidSpeed.x,
+                     gameState->player.solidSpeed.y);
+
     if(just_pressed(INPUT_JUMP) && playerGrounded)
     {
       play_sound(gameState->jumpSound);
       varJumpTimer = 0.0f;
-      speed.y = maxJumpSpeed + solidSpeed.y * 1.5f;
+      speed.y = maxJumpSpeed + gameState->player.solidSpeed.y * 1.5f;
       float xMulti = 2.5f;
-      if(solidSpeed.x)
+      if(gameState->player.solidSpeed.x)
       {
-        if(speed.x < 0 && solidSpeed.x > 0 ||
-          speed.x > 0 && solidSpeed.x < 0)
+        if(speed.x < 0 && gameState->player.solidSpeed.x > 0 ||
+          speed.x > 0 && gameState->player.solidSpeed.x < 0)
         {
           xMulti = 0.5f;
         }
-        speed.x = solidSpeed.x * xMulti;
+        speed.x = gameState->player.solidSpeed.x * xMulti;
       }
       playerGrounded = false;
       gameState->gameInput[INPUT_JUMP].justPressed = false;
@@ -755,7 +517,7 @@ void update()
     if(is_down(INPUT_JUMP) &&
       varJumpTimer < 0.1f)
     {
-      speed.y = min(speed.y, maxJumpSpeed);
+      speed.y = max(speed.y, maxJumpSpeed);
     }
 
     if(just_pressed(INPUT_JUMP))
@@ -764,9 +526,9 @@ void update()
       playerRect.pos.x -= 2;
       playerRect.size.x += 4;
 
-      for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
+      for(int solidIdx = 0; solidIdx < gameState->level.solids.count; solidIdx++)
       {
-        IRect solidRect = solids[solidIdx].rect;
+        IRect solidRect = get_solid_rect(gameState->level.solids[solidIdx]);
 
         if(rect_collision(solidRect, playerRect))
         {
@@ -808,11 +570,12 @@ void update()
       {
         for(int y = 0; y < WORLD_SIZE.y; y++)
         {
-          Tile* tile = get_tile(x, y);
+          Tile* tile = get_tile_fg(x, y);
 
           if(tile->type)
           {
-            IRect tileRect = IRect{x * 8, y * 8, 8, 8};
+            IVec2 tilePos = get_tile_position(x, y);
+            IRect tileRect = get_tile_rect(x, y);
             if(rect_collision(tileRect, playerRect))
             {
               int playerRectLeft = playerRect.pos.x;
@@ -865,7 +628,8 @@ void update()
        !is_down(INPUT_MOVE_UP) &&
        !is_down(INPUT_MOVE_DOWN))
     {
-      if(renderOptions & RENDERING_OPTION_FLIP_X)
+      // Without Input, dash into the direction the player is facing
+      if(gameState->player.renderOptions & RENDERING_OPTION_FLIP_X)
       {
         // Left
         dir.x = -1.0f;
@@ -875,7 +639,6 @@ void update()
         // Right
         dir.x = 1.0f;
       }
-
     }
 
     if(is_down(INPUT_MOVE_LEFT) &&
@@ -929,21 +692,10 @@ void update()
     dashTimer = max(0.0f, dashTimer - dt);
   }
 
-  if(is_down(INPUT_MOVE_UP))
-  {
-    speed.y = approach(speed.y, maxJumpSpeed, 200.0f * dt);
-  }
-
-  if(is_down(INPUT_MOVE_DOWN))
-  {
-    speed.y = approach(speed.y, -maxJumpSpeed, 200.0f * dt);
-  }
-
   // Gravity
   if(!grabbingWall && dashTimer == 0.0f)
   {
-    // speed.y = approach(speed.y, fallSpeed, gravity * dt);
-    speed.y = approach(speed.y, 0, gravity * dt);
+    speed.y = approach(speed.y, fallSpeed, gravity * dt);
   }
 
   // Wall Grabbing
@@ -956,9 +708,9 @@ void update()
       playerRect.pos.x -= 2;
       playerRect.size.x += 4;
 
-      for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
+      for(int solidIdx = 0; solidIdx < gameState->level.solids.count; solidIdx++)
       {
-        IRect solidRect = solids[solidIdx].rect;
+        IRect solidRect = get_solid_rect(gameState->level.solids[solidIdx]);
 
         if(rect_collision(solidRect, playerRect))
         {
@@ -989,11 +741,12 @@ void update()
       {
         for(int y = 0; y < WORLD_SIZE.y; y++)
         {
-          Tile* tile = get_tile(x, y);
+          Tile* tile = get_tile_fg(x, y);
 
           if(tile->type)
           {
-            IRect tileRect = IRect{x * 8, y * 8, 8, 8};
+            IVec2 tilePos = get_tile_position(x, y);
+            IRect tileRect = get_tile_rect(x, y);
             if(rect_collision(tileRect, playerRect))
             {
               int playerRectLeft = playerRect.pos.x;
@@ -1072,9 +825,9 @@ void update()
         IRect newPlayerRect = playerRect;
         newPlayerRect.pos.x += moveSign;
 
-        for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
+        for(int solidIdx = 0; solidIdx < gameState->level.solids.count; solidIdx++)
         {
-          IRect solidRect = solids[solidIdx].rect;
+          IRect solidRect = get_solid_rect(gameState->level.solids[solidIdx]);
 
           if(rect_collision(solidRect, newPlayerRect))
           {
@@ -1089,14 +842,15 @@ void update()
           {
             for(int y = 0; y < WORLD_SIZE.y; y++)
             {
-              Tile* tile = get_tile(x, y);
+              Tile* tile = get_tile_fg(x, y);
 
               if(tile->type)
               {
-                IRect tileRect = IRect{x * 8, y * 8, 8, 8};
+                IVec2 tilePos = get_tile_position(x, y);
+                IRect tileRect = get_tile_rect(x, y);
                 if(tile->type == TILE_TYPE_SPIKE)
                 {
-                  tileRect.pos.y += 4;
+                  tileRect.pos.y -= 4;
                   tileRect.size.y -= 4;
                 }
 
@@ -1104,10 +858,10 @@ void update()
                 {
                   collisionHappened = true;
                   if(tile->type == TILE_TYPE_SPIKE && 
-                     deathAnimTimer == DEATH_ANIM_TIME)
+                     gameState->player.deathAnimTimer == DEATH_ANIM_TIME)
                   {
                     spikeCollision = true;
-                    deathAnimTimer = 0.0f;
+                    gameState->player.deathAnimTimer = 0.0f;
                     speed = normalize(-speed) * dashSpeed;
                     play_sound(gameState->deathSound);
                   }
@@ -1122,7 +876,7 @@ void update()
           if(!collisionHappened)
           {
             //There is no Solid immediately beside us, move
-            gameState->playerPos.x += moveSign; 
+            gameState->player.pos.x += moveSign; 
             move -= moveSign; 
           }
           else
@@ -1160,13 +914,13 @@ void update()
         IRect newPlayerRect = playerRect;
         newPlayerRect.pos.y += moveSign;
 
-        for(int solidIdx = 0; solidIdx < ArraySize(solids); solidIdx++)
+        for(int solidIdx = 0; solidIdx < gameState->level.solids.count; solidIdx++)
         {
-          IRect solidRect = solids[solidIdx].rect;
+          IRect solidRect = get_solid_rect(gameState->level.solids[solidIdx]);
 
           if(rect_collision(solidRect, newPlayerRect))
           {
-            if(speed.y > 0.0f)
+            if(speed.y < 0.0f)
             {
               playerGrounded = true;
               dashCounter = 1;
@@ -1183,30 +937,31 @@ void update()
           {
             for(int y = 0; y < WORLD_SIZE.y; y++)
             {
-              Tile* tile = get_tile(x, y);
+              Tile* tile = get_tile_fg(x, y);
 
               if(tile->type)
               {
-                IRect tileRect = IRect{x * 8, y * 8, 8, 8};
+                IVec2 tilePos = get_tile_position(x, y);
+                IRect tileRect = get_tile_rect(x, y);
                 if(tile->type == TILE_TYPE_SPIKE)
                 {
-                  tileRect.pos.y += 4;
-                  tileRect.size.y -= 4;
+                  // tileRect.pos.y -= 4;
+                  tileRect.size.y = 4;
                 }
 
                 if(rect_collision(tileRect, newPlayerRect))
                 {
-                  if(speed.y > 0.0f)
+                  if(speed.y < 0.0f)
                   {
                     playerGrounded = true;
                     dashCounter = 1;
                   }
 
                   if(tile->type == TILE_TYPE_SPIKE &&
-                     deathAnimTimer == DEATH_ANIM_TIME)
+                     gameState->player.deathAnimTimer == DEATH_ANIM_TIME)
                   {
                     spikeCollision = true;
-                    deathAnimTimer = 0.0f;
+                    gameState->player.deathAnimTimer = 0.0f;
                     speed = normalize(-speed) * dashSpeed;
                     play_sound(gameState->deathSound);
                   }
@@ -1222,7 +977,7 @@ void update()
           if(!collisionHappened)
           {
             // There is no Solid immediately beside us, move
-            gameState->playerPos.y += moveSign; 
+            gameState->player.pos.y += moveSign; 
             move -= moveSign; 
           }
           else
@@ -1251,5 +1006,433 @@ void update()
         }
       } 
     } 
+  }
+}
+
+// #############################################################################
+//                 Implementations Rendering and Updating
+// #############################################################################
+void draw_tile_map(TileMap* tileMap)
+{
+  // BG Tiles
+  {
+    Tileset tileset = tileMap->tileset;
+
+    // Neighbouring Tiles       Top    Left  Right Bottom  
+    int neighbourOffsets[24] = { 0,1,  -1,0,  1,0,  0,-1,   
+    //                         Topleft Topright Bottomleft Bottomright
+                                -1,1,   1,1,     -1,-1,      1,-1,
+    //                          Top2   Left2  Right2 Bottom2
+                                 0,2,  -2,0,  2,0,  0,-2};
+
+    // Topleft     = BIT(4) = 16
+    // Toplright   = BIT(5) = 32
+    // Bottomleft  = BIT(6) = 64
+    // Bottomright = BIT(7) = 128
+
+    for(int x = 0; x < WORLD_SIZE.x; x++)
+    {
+      for(int y = 0; y < WORLD_SIZE.y; y++)
+      {
+        Tile* tile = get_tile(tileMap->tiles, x, y);
+
+        if(!tile->type)
+        {
+          continue;
+        }
+
+        if(tile->type == TILE_TYPE_SPIKE)
+        {
+          draw_sprite(SPRITE_SPIKE, vec_2(get_tile_position(x, y)));
+          continue;
+        }
+
+        // Reset mask every frame
+        tile->neighbourMask = 0;
+        int neighbourCount = 0;
+        int extendedNeighbourCount = 0;
+        int emptyNeighbourSlot = 0;
+
+        // Look at all 4 Neighbours
+        for(int n = 0; n < 12; n++) 
+        {
+          Tile* neighbour = get_tile(tileMap->tiles,
+                                     x + neighbourOffsets[n * 2],
+                                     y + neighbourOffsets[n * 2 + 1]);
+
+
+          if(!neighbour || neighbour->type == TILE_TYPE_SOLID)
+          {
+            tile->neighbourMask |= BIT(n);
+            if(n < 8)
+            {
+              neighbourCount++;
+            }
+            else
+            {
+              extendedNeighbourCount++;
+            }
+          }
+          else if(n < 8)
+          { 
+            emptyNeighbourSlot = n;
+          }
+        }
+
+        if(neighbourCount == 7 && emptyNeighbourSlot >= 4) // We have a corner
+        {
+          tile->neighbourMask = 16 + (emptyNeighbourSlot - 4);
+        }
+        else if(neighbourCount == 8 && extendedNeighbourCount == 4)
+        {
+          tile->neighbourMask = 20;
+        }
+        else
+        {
+          tile->neighbourMask = tile->neighbourMask & 0b1111;
+        }
+
+        // Draw Tile
+        Transform transform = {};
+        transform.pos = vec_2(get_tile_position(x, y));
+        transform.size = Vec2{8.0f, 8.0f};
+        transform.spriteSize = Vec2{8.0f, 8.0f};
+        transform.atlasOffset = vec_2(tileset.tileCoords[tile->neighbourMask]);
+        draw_quad(transform);
+      }
+    }
+  }
+}
+
+void draw(float interpDT)
+{
+  draw_text("Celeste Clone",{-140, 80});
+
+  // BG Tiles
+  draw_tile_map(&gameState->level.bgTileMap);
+
+  // Draw Celeste
+  {
+    IRect playerRect = get_player_rect();
+    Vec2 playerPos = lerp(vec_2(gameState->player.prevPos), 
+                          vec_2(gameState->player.pos), 
+                          interpDT);
+
+    // Death Animation
+    if(gameState->player.deathAnimTimer < DEATH_ANIM_TIME)
+    {
+      Sprite sprite = get_sprite(SPRITE_CELESTE_DEATH);
+      float t = gameState->player.deathAnimTimer;
+      int animationIdx = animate(&t, sprite.frameCount, DEATH_ANIM_TIME);
+      draw_sprite(SPRITE_CELESTE_DEATH,  playerPos, {.animationIdx = animationIdx});
+    }
+    else
+    {  
+      SpriteID spriteID = gameState->player.animationSprites[gameState->player.animationState];
+      Sprite sprite = get_sprite(spriteID);
+      int animationIdx = animate(&gameState->player.runAnimTimer, sprite.frameCount, 0.5f);
+      draw_sprite(spriteID, playerPos, 
+                  {
+                    .animationIdx = animationIdx,
+                    .renderOptions = gameState->player.renderOptions
+                  });
+      draw_quad(playerPos, vec_2(1.0f));
+    }
+  }
+
+  // Forground Tiles
+  {
+    draw_tile_map(&gameState->level.tileMap);
+  }
+
+  // Draw Solids
+  {
+    for(int solidIdx = 0; solidIdx < gameState->level.solids.count; solidIdx++)
+    {
+      Solid solid = gameState->level.solids[solidIdx];
+      Vec2 solidPos = lerp(vec_2(solid.prevPos), 
+                          vec_2(solid.pos), 
+                          interpDT);
+
+      draw_sprite(solid.spriteID, solidPos);
+    }
+  }
+
+  // Draw UI
+  {
+    for(int eleIdx = 0; eleIdx < uiState->uiElements.count; eleIdx++)
+    {
+      UIElement uiElement = uiState->uiElements[eleIdx];
+      draw_sprite(uiElement.spriteID, uiElement.pos);
+    }
+  }
+}
+
+void update()
+{
+  // We update the logic at a fixed rate to keep the game stable 
+  // and to save on performance
+  float dt = UPDATE_DELAY;
+
+
+  // Update Camera
+  {
+    static Vec2 camEndPos = renderData->camera.position;
+    static Vec2 camStartPos = renderData->camera.position;
+    static float t = 0.0f;
+
+    // Camera Position is a multiple of 180(Room Height)
+    {
+      if(camEndPos.y != renderData->camera.position.y)
+      {
+        if(t == 1.0f)
+        {
+          t = 0.0f;
+        }
+        t = min(t + dt, 1.0f);
+        renderData->camera.position = lerp(camStartPos, camEndPos, ease_out_quad(t));
+        return;
+      }
+
+      t = 1.0f; // Hmm
+      camStartPos = camEndPos;
+      int roomIdx = get_room_idx();
+      camEndPos.y = -90.0f - 176.0f * (float)roomIdx;
+      camEndPos.x = renderData->camera.position.x;
+
+
+      if(key_pressed_this_frame(KEY_H))
+      {
+        renderData->camera.position.y -= 1.0f;
+      }
+
+      if(key_pressed_this_frame(KEY_J))
+      {
+        renderData->camera.position.y += 1.0f;
+      }
+    } 
+
+    if(key_is_down(KEY_Z))
+    {
+      renderData->camera.zoom += dt;
+    }
+
+    if(key_is_down(KEY_T))
+    {
+      renderData->camera.zoom -= dt;
+    }
+  }
+
+  update_game_input(dt);
+  update_player(dt);
+  update_ui();
+
+  if(key_pressed_this_frame(KEY_K))
+  {
+    write_file("gamestate.bin", (char*)gameState, sizeof(GameState));
+  }
+
+  // if(do_button(SPRITE_PLAY_BUTTON, {0, 0}, line_id(1)))
+  // {
+    // SM_TRACE("Clicked Button");
+  // }
+
+  if(key_pressed_this_frame(KEY_L))
+  {
+    int fileSize;
+    GameState* emulatedState = (GameState*)read_file("gamestate.bin", &fileSize, transientStorage);
+    SM_ASSERT(sizeof(GameState) == fileSize, "Penis");
+    if(emulatedState)
+    {
+      *gameState = *emulatedState;
+    }
+  }
+
+  // Leveleditor
+  {
+    if(key_is_down(KEY_LEFT_MOUSE))
+    {
+      IVec2 worldPos = get_world_pos(input->mousePosScreen);
+
+      Tile* tile = get_tile(worldPos);
+      if(tile)
+      {
+        if(key_is_down(KEY_SHIFT))
+        {
+          tile->type = TILE_TYPE_SPIKE;
+        }
+        else
+        {
+          tile->type = TILE_TYPE_SOLID;
+        }
+      }
+    }
+
+    if(key_is_down(KEY_RIGHT_MOUSE))
+    {
+      IVec2 worldPos = get_world_pos(input->mousePosScreen);
+      Tile* tile = get_tile(worldPos);
+      if(tile)
+      {
+        tile->type = TILE_TYPE_NONE;
+      }
+    }
+  }
+
+  // Updating Solids
+  {
+    gameState->player.solidSpeed = {};
+
+    for(int solidIdx = 0; solidIdx < gameState->level.solids.count; solidIdx++)
+    {
+      Solid* solid = &gameState->level.solids[solidIdx];
+      solid->prevPos = solid->pos;
+      solid->prevRemainder = solid->remainder;
+
+      if(solid->keyframes.count > 1)
+      {
+        solid->time += dt;
+
+        int nextKeyframeIdx = 1;
+        
+        bool sdfkljsdfklsjkldfj = false;
+        for(int keyframeIdx = 0; keyframeIdx < solid->keyframes.count;
+            keyframeIdx++)
+        {
+          if(solid->keyframes[keyframeIdx].time > solid->time)
+          {
+            sdfkljsdfklsjkldfj = true;
+            nextKeyframeIdx = keyframeIdx;
+            break;
+          }
+        } 
+
+        if(!sdfkljsdfklsjkldfj)
+        {
+          solid->time -= solid->keyframes[solid->keyframes.count - 1].time;
+        }
+
+        int currentKeyframeIdx = nextKeyframeIdx - 1;
+        if(currentKeyframeIdx < 0)
+        {
+          currentKeyframeIdx = solid->keyframes.count - 1;
+        }
+
+        Keyframe currentKeyframe = solid->keyframes[currentKeyframeIdx];
+        Keyframe nextKeyframe  = solid->keyframes[nextKeyframeIdx];
+
+        float t = (solid->time - currentKeyframe.time) / 
+                  (nextKeyframe.time - currentKeyframe.time);
+
+        Vec2 nextPos = vec_2(currentKeyframe.pos) + vec_2(nextKeyframe.pos - currentKeyframe.pos) * t;
+        float speedX = nextPos.x - (float)solid->pos.x;
+        // Move X
+        {
+          float amount = speedX;
+          solid->remainder.x += amount; 
+          int move = round(solid->remainder.x);   
+          if (move != 0) 
+          { 
+            solid->remainder.x -= move; 
+            int moveSign = sign(move);
+            while (move != 0) 
+            { 
+              bool collisionHappened = false;
+
+              IRect solidRect = get_solid_rect(gameState->level.solids[solidIdx]);
+              IRect newSolidRect = solidRect;
+              newSolidRect.pos.x += moveSign;
+              IRect playerRect = get_player_rect();
+              playerRect.pos.y -= 2;
+              playerRect.size.y += 4;
+
+              // Is Celeste currently standing on this Solid,
+              // or is she getting pushed
+              if(rect_collision(playerRect, newSolidRect))
+              {
+                if(solidRect.pos.y <= playerRect.pos.y + playerRect.size.y)
+                {
+                  gameState->player.pos.x += moveSign;
+                  gameState->player.solidSpeed.x = speedX;
+                }
+                  
+                for(int subSolidIdx = 0; 
+                    subSolidIdx < gameState->level.solids.count;
+                    subSolidIdx++)
+                {
+                  if(subSolidIdx == solidIdx)
+                  {
+                    continue;
+                  }
+
+                  IRect subSolidRect = 
+                    get_solid_rect(gameState->level.solids[subSolidIdx]);
+                  if(rect_collision(get_player_rect(), subSolidRect))
+                  {
+                    gameState->player.pos = gameState->level.playerStartPos;
+                  }
+                }
+              }
+
+              solid->pos.x += moveSign; 
+              move -= moveSign; 
+            } 
+          }
+        }
+
+        // Move Y
+        float speedY = nextPos.y - (float)solid->pos.y;
+        {
+          float amount = nextPos.y - (float)solid->pos.y;
+          solid->remainder.y += amount; 
+          int move = round(solid->remainder.y);   
+          if (move != 0) 
+          { 
+            solid->remainder.y -= move; 
+            int moveSign = sign(move);
+            while (move != 0) 
+            { 
+              bool collisionHappened = false;
+
+              IRect solidRect = get_solid_rect(gameState->level.solids[solidIdx]);
+              IRect newSolidRect = solidRect;
+              newSolidRect.pos.x += moveSign;
+              IRect playerRect = get_player_rect();
+              playerRect.pos.y -= 2;
+              playerRect.size.y += 4;
+
+              // Is the player currently standing on this Solid
+              if(rect_collision(playerRect, newSolidRect))
+              {
+                if(solidRect.pos.y <= playerRect.pos.y + playerRect.size.y)
+                {
+                  gameState->player.pos.y += moveSign;
+                  gameState->player.solidSpeed.y = speedY;
+                }
+
+                for(int subSolidIdx = 0; 
+                    subSolidIdx < gameState->level.solids.count;
+                    subSolidIdx++)
+                {
+                  if(subSolidIdx == solidIdx)
+                  {
+                    continue;
+                  }
+
+                  IRect subSolidRect = get_solid_rect(gameState->level.solids[subSolidIdx]);
+                  if(rect_collision(get_player_rect(), subSolidRect))
+                  {
+                    gameState->player.pos = gameState->level.playerStartPos;
+                  }
+                }
+              }
+
+              solid->pos.y += moveSign; 
+              move -= moveSign; 
+            } 
+          } 
+        }
+      }
+    }
   }
 }
