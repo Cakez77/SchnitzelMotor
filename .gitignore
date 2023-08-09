@@ -26,3 +26,4 @@ build
 generate_ctags.bat
 .tags
 !freetype.dll
+!freetype.lib
