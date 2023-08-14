@@ -9,3 +9,10 @@ CompileFlags:
 
     - "-Wno-writable-strings"
     - "-Wno-sign-compare"
+
+---
+
+If:
+  PathExclude: "src/game.cpp"
+CompileFlags:
+  Add: "-include main.cpp"
