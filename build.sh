@@ -11,7 +11,7 @@ if [[ "$(uname)" == "Linux" ]]; then
     outputFile=schnitzel
     queryProcesses=$(pgrep $outputFile)
     # fPIC position independent code
-    clang++ -g "src/game.cpp" -shared -fPIC -o game_$timestamp.so $warnings
+    clang++ -g "src/game.cpp" -shared -fPIC -o game_$timestamp.so $warnings $defines
     mv game_$timestamp.so game.so
 
 elif [[ "$(uname)" == "Darwin" ]]; then

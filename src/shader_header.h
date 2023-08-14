@@ -6,10 +6,13 @@
 #define ivec2 IVec2
 #define vec4 Vec4
 
-#else // Inside Shader
+// Inside Shader
+#else 
 
 #define BIT(i) 1 << i
-#endif // Inside Both
+
+// Inside Both
+#endif 
 
 // #############################################################################
 //                           Rendering Constants
