@@ -455,6 +455,11 @@ void platform_update_window()
   input->prevMousePosScreen = input->mousePosScreen;
   input->mousePosScreen = Vec2{(float)p.x, (float)p.y};
   input->mousePosWorld = input->mousePosScreen / worldScale;
+  input->mousePosWorld.x += -renderData->camera.dimensions.x / 2.0f + 
+                             renderData->camera.position.x;
+  input->mousePosWorld.y = -(input->mousePosWorld.y - 
+                             renderData->camera.dimensions.y / 2.0f + 
+                             renderData->camera.position.y);
   input->relMouseScreen = input->mousePosScreen - input->prevMousePosScreen;
 
   while(PeekMessageA(&msg, window, 0, 0, PM_REMOVE))

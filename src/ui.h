@@ -96,7 +96,7 @@ bool do_button(SpriteID spriteID, IVec2 pos, int ID)
   if(is_active(ID))
   {
     if(key_released_this_frame(KEY_LEFT_MOUSE) &&
-       point_in_rect(input->cameraLocalPos, rect))
+       point_in_rect(input->mousePosWorld, rect))
     {
       // Set inactive     
       uiState->active = {};
@@ -111,7 +111,7 @@ bool do_button(SpriteID spriteID, IVec2 pos, int ID)
     }
   }
 
-  if(point_in_rect(input->cameraLocalPos, rect))
+  if(point_in_rect(input->mousePosWorld, rect))
   {
     set_hot(ID);
   }

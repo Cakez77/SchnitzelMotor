@@ -124,8 +124,16 @@ struct Level
   Array<Solid, 50> solids;
 };
 
+enum GameStateID
+{
+  GAME_STATE_MAIN_MENU,
+  GAME_STATE_IN_LEVEL
+};
+
 struct GameState
 {
+  GameStateID state;
+
   double updateTimer;
   bool initialized = false;
   float cameraTimer;

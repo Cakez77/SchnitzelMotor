@@ -16,6 +16,7 @@
 // #############################################################################
 int RENDERING_OPTION_FLIP_X = BIT(0);
 int RENDERING_OPTION_FONT = BIT(1);
+int RENDERING_OPTION_TRANSPARENT = BIT(2);
 
 // #############################################################################
 //                           Rendering Structs
@@ -27,7 +28,7 @@ struct Transform
   vec2 atlasOffset;
   vec2 spriteSize;
   int renderOptions;
-  int padding;
+  float layer;
 };
 
 struct Material

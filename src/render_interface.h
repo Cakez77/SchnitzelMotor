@@ -11,13 +11,13 @@ constexpr int MAX_TRANSFORMS = 10000;
 // #############################################################################
 //                           Render Interface Structs
 // #############################################################################
-
 struct DrawData
 {
   // Used to generate an X - Offset based on the 
   // X - Size of the Sprite
   int animationIdx;
   int renderOptions;
+  float layer = 1.0f;
 };
 
 struct OrthographicCamera2D
@@ -37,9 +37,11 @@ struct Glyph
 
 struct RenderData
 {
+  Vec4 clearColor;
   Glyph glyphs[127];
   OrthographicCamera2D camera;
   Array<Transform, MAX_TRANSFORMS> transforms;
+  Array<Transform, MAX_TRANSFORMS> transparent_transforms;
 };
 
 // #############################################################################
@@ -58,7 +60,14 @@ void draw_quad(Transform transform)
   // Screen Space Y grows down by default
   // This inverts all Y Positions so that Y grows UP 
   transform.pos.y *= -1;
-  renderData->transforms.add(transform);
+  if(transform.renderOptions & RENDERING_OPTION_TRANSPARENT)
+  {
+    renderData->transparent_transforms.add(transform);
+  }
+  else 
+  {
+    renderData->transforms.add(transform);
+  }
 }
 
 void draw_quad(Vec2 pos, Vec2 size, DrawData drawData = {})
@@ -68,6 +77,7 @@ void draw_quad(Vec2 pos, Vec2 size, DrawData drawData = {})
   transform.size = size;
   // References SPRITE_WHITE from the Atlas
   transform.spriteSize = {1.0f, 1.0f}; 
+  transform.layer = drawData.layer;
 
   draw_quad(transform);
 }
@@ -92,6 +102,7 @@ void draw_sprite(SpriteID spriteID, Vec2 pos, DrawData drawData = {})
   transform.spriteSize = vec_2(sprite.size);
   transform.renderOptions = drawData.renderOptions;
   transform.atlasOffset = vec_2(sprite.atlasOffset);
+  transform.layer = drawData.layer;
 
   draw_quad(transform);
 }
@@ -121,6 +132,7 @@ void draw_text(char* text, Vec2 pos)
     transform.spriteSize = glyph.size;
     transform.size = glyph.size;
     transform.renderOptions = RENDERING_OPTION_FONT;
+    transform.layer = 1.0f;
     draw_quad(transform);
 
     prev = c;

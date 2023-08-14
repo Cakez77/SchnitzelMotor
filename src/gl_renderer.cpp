@@ -296,6 +296,9 @@ bool gl_init(BumpAllocator* transientStorage)
   glEnable(GL_FRAMEBUFFER_SRGB);
   glDisable(0x809D); // disable multisampling
 
+  glEnable(GL_DEPTH_TEST);
+  glDepthFunc(GL_GREATER);
+
   return true;
 }
 
@@ -320,8 +323,12 @@ void gl_render()
   }
 
   // Linux Colors, kinda
-  glClearColor(0.2f, 0.02f, 0.2f, 1.0f);
-  glClear(GL_COLOR_BUFFER_BIT);
+  glClearColor(renderData->clearColor.r, 
+               renderData->clearColor.g, 
+               renderData->clearColor.b, 
+               renderData->clearColor.a);
+  glClearDepth(0.0f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   glViewport(0, 0, input->screenSize.x, input->screenSize.y);
 
@@ -344,14 +351,30 @@ void gl_render()
                       &projectionMatrix.ax);
   }
 
+  // Opaque Objects
+  {
+    // Copy transforms to the GPU
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Transform) * MAX_TRANSFORMS,
+                    renderData->transforms.elements);
+    // Reset for next Frame
 
-  // Copy transforms to the GPU
-  glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Transform) * MAX_TRANSFORMS,
-                  renderData->transforms.elements);
-  // Reset for next Frame
+    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, renderData->transforms.count);
+    renderData->transforms.clear();
+  }
 
-  glDrawArraysInstanced(GL_TRIANGLES, 0, 6, renderData->transforms.count);
-  renderData->transforms.clear();
+  // Transparent Objects
+  {
+    glEnable(GL_BLEND);      
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Copy transparent transforms to the GPU
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Transform) * MAX_TRANSFORMS,
+                    renderData->transparent_transforms.elements);
+    // Reset for next Frame
+    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, renderData->transparent_transforms.count);
+    glDisable(GL_BLEND);
+    renderData->transparent_transforms.clear();
+  }
 }
 
 

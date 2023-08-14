@@ -5,9 +5,11 @@ enum SpriteID
 {
   SPRITE_WHITE,
   SPRITE_CELESTE_01,
+  SPRITE_CELESTE_01_BIG,
   SPRITE_CELESTE_01_RUN,
   SPRITE_CELESTE_01_JUMP,
   SPRITE_CELESTE_02,
+  SPRITE_CELESTE_02_BIG,
   SPRITE_TILE_01,
   SPRITE_SPIKE,
   SPRITE_CELESTE_DEATH,
@@ -46,6 +48,13 @@ Sprite get_sprite(SpriteID spriteID)
       break;
     }
 
+    case SPRITE_CELESTE_01_BIG:
+    {
+      sprite.atlasOffset = {320, 496};
+      sprite.size = {176, 272};
+      break;
+    }
+
     case SPRITE_CELESTE_01_RUN:
     {
       sprite.atlasOffset = {496, 0};
@@ -66,6 +75,13 @@ Sprite get_sprite(SpriteID spriteID)
     {
       sprite.atlasOffset = {32, 0};
       sprite.size = {17, 20};
+      break;
+    }
+
+    case SPRITE_CELESTE_02_BIG:
+    {
+      sprite.atlasOffset = {144, 752};
+      sprite.size = {176, 272};
       break;
     }
 

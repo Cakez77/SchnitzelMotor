@@ -579,7 +579,7 @@ Mat4 orthographic_projection(float left, float right, float top, float bottom)
   result.cw = -0.0f; // Near Plane
   result[0][0] = 2.0f / (right - left);
   result[1][1] = 2.0f / (top - bottom);
-  result[2][2] = -1.0f / (1.0f - 0.0f);
+  result[2][2] = 1.0f / (1.0f - 0.0f);
   result[3][3] = 1.0f;
 
   return result;

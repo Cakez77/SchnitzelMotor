@@ -44,6 +44,7 @@ void update_player(float dt);
 // Disconnected Rendering and Updating
 void draw_tile_map(TileMap* tileMap);
 void draw(float interpolatedDT);
+void update_level(float dt);
 void update();
 
 // #############################################################################
@@ -79,17 +80,20 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
     gameState->player.deathAnimTimer = DEATH_ANIM_TIME;
     gameState->level.playerStartPos = {0, 4 * 8};
     gameState->player.pos = gameState->level.playerStartPos;
+    gameState->player.prevPos = gameState->player.pos;
 
     // Solids
     {
       gameState->level.solids.add(
       {
         .spriteID = SPRITE_SOLID_01,
-        .pos = {2 * 8,  10 * 8}
+        .prevPos = {2 * 8,  10 * 8},
+        .pos = {2 * 8,  10 * 8},
       });
       gameState->level.solids.add(
       {
         .spriteID = SPRITE_SOLID_01,
+        .prevPos = {0 * 8, 10 * 8},
         .pos = {0 * 8, 10 * 8},
         .keyframes = 
         {
@@ -106,6 +110,7 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
       gameState->level.solids.add(
       {
         .spriteID = SPRITE_SOLID_02,
+        .prevPos = {-5 * 8, 10 * 8},
         .pos = {-5 * 8, 10 * 8},
         .keyframes = 
         {
@@ -119,6 +124,12 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
           }
         }
       });
+    }
+
+    if(do_button(SPRITE_PLAY_BUTTON, {0, 0}, line_id(1)))
+    {
+      // callback
+      SM_TRACE("Button Clicked");
     }
 
     // Foreground Tileset
@@ -247,7 +258,8 @@ bool just_pressed(GameInputType type)
 IVec2 get_world_pos(Vec2 mousePos)
 {
   Vec2 localPos = mousePos / worldScale;
-  localPos.x += renderData->camera.position.x;
+  localPos.x += -renderData->camera.dimensions.x / 2.0f + renderData->camera.position.x;
+  localPos.y = -(localPos.y - renderData->camera.dimensions.y / 2.0f + renderData->camera.position.y);
   return ivec_2(localPos);
 }
 
@@ -276,8 +288,8 @@ Tile* get_tile_bg(int x, int y)
 Tile* get_tile(IVec2 worldPos)
 {
   int roomIdx = get_room_idx();
-  int x = worldPos.x / TILESIZE;
-  int y = ROOM_SIZE.y - worldPos.y / TILESIZE + ROOM_SIZE.y * roomIdx;
+  int x = (worldPos.x + renderData->camera.dimensions.x / 2.0f)/ TILESIZE;
+  int y = (worldPos.y + TILESIZE / 2) / TILESIZE;
 
   SM_TRACE("X: %d, Y: %d", x, y);
   SM_TRACE("Player Pos: X: %d, Y: %d", gameState->player.pos.x, 
@@ -1106,57 +1118,8 @@ void draw_tile_map(TileMap* tileMap)
 
 void draw(float interpDT)
 {
-  draw_text("Celeste Clone",{-140, 80});
-
-  // BG Tiles
-  draw_tile_map(&gameState->level.bgTileMap);
-
-  // Draw Celeste
-  {
-    IRect playerRect = get_player_rect();
-    Vec2 playerPos = lerp(vec_2(gameState->player.prevPos), 
-                          vec_2(gameState->player.pos), 
-                          interpDT);
-
-    // Death Animation
-    if(gameState->player.deathAnimTimer < DEATH_ANIM_TIME)
-    {
-      Sprite sprite = get_sprite(SPRITE_CELESTE_DEATH);
-      float t = gameState->player.deathAnimTimer;
-      int animationIdx = animate(&t, sprite.frameCount, DEATH_ANIM_TIME);
-      draw_sprite(SPRITE_CELESTE_DEATH,  playerPos, {.animationIdx = animationIdx});
-    }
-    else
-    {  
-      SpriteID spriteID = gameState->player.animationSprites[gameState->player.animationState];
-      Sprite sprite = get_sprite(spriteID);
-      int animationIdx = animate(&gameState->player.runAnimTimer, sprite.frameCount, 0.5f);
-      draw_sprite(spriteID, playerPos, 
-                  {
-                    .animationIdx = animationIdx,
-                    .renderOptions = gameState->player.renderOptions
-                  });
-      draw_quad(playerPos, vec_2(1.0f));
-    }
-  }
-
-  // Forground Tiles
-  {
-    draw_tile_map(&gameState->level.tileMap);
-  }
-
-  // Draw Solids
-  {
-    for(int solidIdx = 0; solidIdx < gameState->level.solids.count; solidIdx++)
-    {
-      Solid solid = gameState->level.solids[solidIdx];
-      Vec2 solidPos = lerp(vec_2(solid.prevPos), 
-                          vec_2(solid.pos), 
-                          interpDT);
-
-      draw_sprite(solid.spriteID, solidPos);
-    }
-  }
+  Vec4 clearColor = {79.0f / 255.0f, 140.0f / 255.0f, 235.0f / 255.0f, 1.0f};
+  renderData->clearColor = clearColor * (gameState->player.pos.y / ((float)ROOM_HEIGHT * 100.0f));
 
   // Draw UI
   {
@@ -1166,76 +1129,101 @@ void draw(float interpDT)
       draw_sprite(uiElement.spriteID, uiElement.pos);
     }
   }
-}
 
-void update()
-{
-  // We update the logic at a fixed rate to keep the game stable 
-  // and to save on performance
-  float dt = UPDATE_DELAY;
-
-
-  // Update Camera
+  // Don't like the double switch statement much tbh,
+  // but it's the easiest solution right now!
+  switch(gameState->state)
   {
-    static Vec2 camEndPos = renderData->camera.position;
-    static Vec2 camStartPos = renderData->camera.position;
-    static float t = 0.0f;
-
-    // Camera Position is a multiple of 180(Room Height)
+    case GAME_STATE_MAIN_MENU:
     {
-      if(camEndPos.y != renderData->camera.position.y)
-      {
-        if(t == 1.0f)
-        {
-          t = 0.0f;
-        }
-        t = min(t + dt, 1.0f);
-        renderData->camera.position = lerp(camStartPos, camEndPos, ease_out_quad(t));
-        return;
-      }
+      // Only draw UI
+      renderData->clearColor = {79.0f / 255.0f, 140.0f / 255.0f, 235.0f / 255.0f, 1.0f};
+      draw_text("Celeste Clone",{-44, 170});
+      draw_sprite(SPRITE_CELESTE_01_BIG, {-80, 60}, 
+                  {
+                    .renderOptions = RENDERING_OPTION_TRANSPARENT,
+                    .layer = 0.7f,
+                  });
 
-      t = 1.0f; // Hmm
-      camStartPos = camEndPos;
-      int roomIdx = get_room_idx();
-      camEndPos.y = -90.0f - 176.0f * (float)roomIdx;
-      camEndPos.x = renderData->camera.position.x;
+      draw_sprite(SPRITE_CELESTE_02_BIG, {80, 60}, 
+                  {
+                    .renderOptions = RENDERING_OPTION_TRANSPARENT,
+                    .layer = 0.7f,
+                  });
 
-
-      if(key_pressed_this_frame(KEY_H))
-      {
-        renderData->camera.position.y -= 1.0f;
-      }
-
-      if(key_pressed_this_frame(KEY_J))
-      {
-        renderData->camera.position.y += 1.0f;
-      }
-    } 
-
-    if(key_is_down(KEY_Z))
-    {
-      renderData->camera.zoom += dt;
+      break;
     }
 
-    if(key_is_down(KEY_T))
+    case GAME_STATE_IN_LEVEL:
     {
-      renderData->camera.zoom -= dt;
+      // Draw Level
+      {
+        // Draw Solids
+        {
+          for(int solidIdx = 0; solidIdx < gameState->level.solids.count; solidIdx++)
+          {
+            Solid solid = gameState->level.solids[solidIdx];
+            Vec2 solidPos = lerp(vec_2(solid.prevPos), 
+                                vec_2(solid.pos), 
+                                interpDT);
+
+            draw_sprite(solid.spriteID, solidPos);
+          }
+        }
+
+        // Forground Tiles
+        draw_tile_map(&gameState->level.tileMap);
+
+        // Draw Celeste
+        {
+          IRect playerRect = get_player_rect();
+          Vec2 playerPos = lerp(vec_2(gameState->player.prevPos), 
+                                vec_2(gameState->player.pos), 
+                                interpDT);
+
+          // Death Animation
+          if(gameState->player.deathAnimTimer < DEATH_ANIM_TIME)
+          {
+            Sprite sprite = get_sprite(SPRITE_CELESTE_DEATH);
+            float t = gameState->player.deathAnimTimer;
+            int animationIdx = animate(&t, sprite.frameCount, DEATH_ANIM_TIME);
+            draw_sprite(SPRITE_CELESTE_DEATH,  playerPos, {.animationIdx = animationIdx});
+          }
+          else
+          {  
+            SpriteID spriteID = gameState->player.animationSprites[gameState->player.animationState];
+            Sprite sprite = get_sprite(spriteID);
+            int animationIdx = animate(&gameState->player.runAnimTimer, sprite.frameCount, 0.5f);
+            draw_sprite(spriteID, playerPos, 
+                        {
+                          .animationIdx = animationIdx,
+                          .renderOptions = gameState->player.renderOptions
+                        });
+            draw_quad(playerPos, vec_2(1.0f));
+          }
+        }
+
+        // BG Tiles
+        draw_tile_map(&gameState->level.bgTileMap);
+      }
     }
   }
 
-  update_game_input(dt);
+}
+
+void update_level(float dt)
+{
   update_player(dt);
-  update_ui();
+
+  if(key_pressed_this_frame(KEY_ESCAPE))
+  {
+    gameState->state = GAME_STATE_MAIN_MENU;
+  }
 
   if(key_pressed_this_frame(KEY_K))
   {
     write_file("gamestate.bin", (char*)gameState, sizeof(GameState));
   }
-
-  // if(do_button(SPRITE_PLAY_BUTTON, {0, 0}, line_id(1)))
-  // {
-    // SM_TRACE("Clicked Button");
-  // }
 
   if(key_pressed_this_frame(KEY_L))
   {
@@ -1433,6 +1421,84 @@ void update()
           } 
         }
       }
+    }
+  }
+}
+
+void update()
+{
+  // We update the logic at a fixed rate to keep the game stable 
+  // and to save on performance
+  float dt = UPDATE_DELAY;
+
+  // Update Camera
+  {
+    static Vec2 camEndPos = renderData->camera.position;
+    static Vec2 camStartPos = renderData->camera.position;
+    static float t = 0.0f;
+
+    // Camera Position is a multiple of 180(Room Height)
+    {
+      if(camEndPos.y != renderData->camera.position.y)
+      {
+        if(t == 1.0f)
+        {
+          t = 0.0f;
+        }
+        t = min(t + dt, 1.0f);
+        renderData->camera.position = lerp(camStartPos, camEndPos, ease_out_quad(t));
+        return;
+      }
+
+      t = 1.0f; // Hmm
+      camStartPos = camEndPos;
+      int roomIdx = get_room_idx();
+      camEndPos.y = -90.0f - 176.0f * (float)roomIdx;
+      camEndPos.x = renderData->camera.position.x;
+
+
+      if(key_pressed_this_frame(KEY_H))
+      {
+        renderData->camera.position.y -= 1.0f;
+      }
+
+      if(key_pressed_this_frame(KEY_J))
+      {
+        renderData->camera.position.y += 1.0f;
+      }
+    } 
+
+    if(key_is_down(KEY_Z))
+    {
+      renderData->camera.zoom += dt;
+    }
+
+    if(key_is_down(KEY_T))
+    {
+      renderData->camera.zoom -= dt;
+    }
+  }
+
+  update_game_input(dt);
+  update_ui();
+
+  switch(gameState->state)
+  {
+    case GAME_STATE_MAIN_MENU:
+    {
+      if(do_button(SPRITE_PLAY_BUTTON, {0, 80}, line_id(1)))
+      {
+        gameState->state = GAME_STATE_IN_LEVEL;
+      }
+
+      break;
+    }
+
+    case GAME_STATE_IN_LEVEL:
+    {
+      update_level(dt);
+
+      break;
     }
   }
 }
