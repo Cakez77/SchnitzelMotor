@@ -168,13 +168,22 @@ EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn,
                                tilesPosition.y + 5 * 8});
     }
 
-    // Camera
-    renderData->camera.position.y = -90.0f;
-    renderData->camera.zoom = 1.0f;
-    renderData->camera.dimensions.x = ROOM_WIDTH;
-    renderData->camera.dimensions.y = ROOM_HEIGHT;
-    renderData->camera.zoom = 1.0f;
+    // Game Camera
+    renderData->gameCamera.position.y = -90.0f;
+    renderData->gameCamera.dimensions.x = ROOM_WIDTH;
+    renderData->gameCamera.dimensions.y = ROOM_HEIGHT;
+    renderData->gameCamera.zoom = 1.0f;
+    renderData->gameCamera.position.y = 
+      renderData->gameCamera.dimensions.y / 2.0f;
     gameState->cameraTimer = 1.0f;
+
+    // UI Camera
+    renderData->uiCamera.dimensions.x = ROOM_WIDTH; // 320
+    renderData->uiCamera.dimensions.y = ROOM_HEIGHT; // 180
+    // Top Left is going to be 0/0 now
+    renderData->uiCamera.position.x = renderData->uiCamera.dimensions.x / 2.0f;
+    renderData->uiCamera.position.y = -renderData->uiCamera.dimensions.y / 2.0f;
+    renderData->uiCamera.zoom = 1.0f;
 
     gameState->initialized = true;
   }
@@ -255,11 +264,11 @@ bool just_pressed(GameInputType type)
 // #############################################################################
 //                           Implementations Tiles
 // #############################################################################
-IVec2 get_world_pos(Vec2 mousePos)
+IVec2 get_world_pos(IVec2 mousePos)
 {
-  Vec2 localPos = mousePos / worldScale;
-  localPos.x += -renderData->camera.dimensions.x / 2.0f + renderData->camera.position.x;
-  localPos.y = -(localPos.y - renderData->camera.dimensions.y / 2.0f + renderData->camera.position.y);
+  Vec2 localPos = vec_2(mousePos) / worldScale;
+  localPos.x += -renderData->gameCamera.dimensions.x / 2.0f + renderData->gameCamera.position.x;
+  localPos.y = -(localPos.y - renderData->gameCamera.dimensions.y / 2.0f + renderData->gameCamera.position.y);
   return ivec_2(localPos);
 }
 
@@ -288,7 +297,7 @@ Tile* get_tile_bg(int x, int y)
 Tile* get_tile(IVec2 worldPos)
 {
   int roomIdx = get_room_idx();
-  int x = (worldPos.x + renderData->camera.dimensions.x / 2.0f)/ TILESIZE;
+  int x = (worldPos.x + renderData->gameCamera.dimensions.x / 2.0f)/ TILESIZE;
   int y = (worldPos.y + TILESIZE / 2) / TILESIZE;
 
   SM_TRACE("X: %d, Y: %d", x, y);
@@ -305,7 +314,7 @@ Tile* get_tile(IVec2 worldPos)
 
 IVec2 get_tile_position(int x, int y)
 {
-  return IVec2{x * TILESIZE - ROOM_WIDTH / 2 + TILESIZE / 2, 
+  return IVec2{x * TILESIZE - ROOM_WIDTH / 2, 
                y * TILESIZE};
 }
 
@@ -503,10 +512,6 @@ void update_player(float dt)
 
   // Jumping
   {
-    draw_format_text("Solid Speed: %.2f, %.2f", {-150, 100},
-                     gameState->player.solidSpeed.x,
-                     gameState->player.solidSpeed.y);
-
     if(just_pressed(INPUT_JUMP) && playerGrounded)
     {
       play_sound(gameState->jumpSound);
@@ -1121,12 +1126,45 @@ void draw(float interpDT)
   Vec4 clearColor = {79.0f / 255.0f, 140.0f / 255.0f, 235.0f / 255.0f, 1.0f};
   renderData->clearColor = clearColor * (gameState->player.pos.y / ((float)ROOM_HEIGHT * 100.0f));
 
+  // Game ortho projection
+  {
+    OrthographicCamera2D camera = renderData->gameCamera;
+    float zoom = camera.zoom? camera.zoom : 1.0f;
+    Vec2 dimensions = camera.dimensions * 1.0f / zoom;
+    Vec2 position = camera.position * (float)max((int)(1.0f / zoom), 1);
+    renderData->orthoProjectionGame = 
+      orthographic_projection(position.x - dimensions.x / 2.0f, 
+                              position.x + dimensions.x / 2.0f, 
+                              position.y - dimensions.y / 2.0f, 
+                              position.y + dimensions.y / 2.0f);
+  }
+
+  // UI ortho projection
+  {
+    OrthographicCamera2D camera = renderData->uiCamera;
+    float zoom = camera.zoom? camera.zoom : 1.0f;
+    Vec2 dimensions = camera.dimensions * 1.0f / zoom;
+    Vec2 position = camera.position * (float)max((int)(1.0f / zoom), 1);
+    renderData->orthoProjectionUI = 
+    orthographic_projection(position.x - dimensions.x / 2.0f, 
+                          position.x + dimensions.x / 2.0f, 
+                          position.y - dimensions.y / 2.0f, 
+                          position.y + dimensions.y / 2.0f);
+  }
+
+  // Vec2 mousePosUi = screen_to_world(renderData->gameCamera, input->mousePos);
+  // draw_format_ui_text("Mouse Pos World: %.2f, %.2f", {10, 20}, mousePosUi.x, mousePosUi.y);
+  // draw_format_ui_text("Camera Pos: %.2f, %.2f", {10, 40}, 
+  //                     renderData->gameCamera.position.x, 
+  //                     renderData->gameCamera.position.y);
+  // draw_sprite(SPRITE_PLAY_BUTTON, {0, 10});
+ 
   // Draw UI
   {
     for(int eleIdx = 0; eleIdx < uiState->uiElements.count; eleIdx++)
     {
       UIElement uiElement = uiState->uiElements[eleIdx];
-      draw_sprite(uiElement.spriteID, uiElement.pos);
+      draw_ui_sprite(uiElement.spriteID, uiElement.pos);
     }
   }
 
@@ -1139,13 +1177,13 @@ void draw(float interpDT)
       // Only draw UI
       renderData->clearColor = {79.0f / 255.0f, 140.0f / 255.0f, 235.0f / 255.0f, 1.0f};
       draw_text("Celeste Clone",{-44, 170});
-      draw_sprite(SPRITE_CELESTE_01_BIG, {-80, 60}, 
+      draw_ui_sprite(SPRITE_CELESTE_01_BIG, {80, 120}, 
                   {
                     .renderOptions = RENDERING_OPTION_TRANSPARENT,
                     .layer = 0.7f,
                   });
 
-      draw_sprite(SPRITE_CELESTE_02_BIG, {80, 60}, 
+      draw_ui_sprite(SPRITE_CELESTE_02_BIG, {240, 120}, 
                   {
                     .renderOptions = RENDERING_OPTION_TRANSPARENT,
                     .layer = 0.7f,
@@ -1208,7 +1246,6 @@ void draw(float interpDT)
       }
     }
   }
-
 }
 
 void update_level(float dt)
@@ -1240,7 +1277,7 @@ void update_level(float dt)
   {
     if(key_is_down(KEY_LEFT_MOUSE))
     {
-      IVec2 worldPos = get_world_pos(input->mousePosScreen);
+      IVec2 worldPos = ivec_2(screen_to_world(renderData->gameCamera, input->mousePos));
 
       Tile* tile = get_tile(worldPos);
       if(tile)
@@ -1258,7 +1295,7 @@ void update_level(float dt)
 
     if(key_is_down(KEY_RIGHT_MOUSE))
     {
-      IVec2 worldPos = get_world_pos(input->mousePosScreen);
+      IVec2 worldPos = ivec_2(screen_to_world(renderData->gameCamera, input->mousePos));
       Tile* tile = get_tile(worldPos);
       if(tile)
       {
@@ -1433,20 +1470,21 @@ void update()
 
   // Update Camera
   {
-    static Vec2 camEndPos = renderData->camera.position;
-    static Vec2 camStartPos = renderData->camera.position;
+    static Vec2 camEndPos = renderData->gameCamera.position;
+    static Vec2 camStartPos = renderData->gameCamera.position;
     static float t = 0.0f;
 
     // Camera Position is a multiple of 180(Room Height)
+    if(false)
     {
-      if(camEndPos.y != renderData->camera.position.y)
+      if(camEndPos.y != renderData->gameCamera.position.y)
       {
         if(t == 1.0f)
         {
           t = 0.0f;
         }
         t = min(t + dt, 1.0f);
-        renderData->camera.position = lerp(camStartPos, camEndPos, ease_out_quad(t));
+        renderData->gameCamera.position = lerp(camStartPos, camEndPos, ease_out_quad(t));
         return;
       }
 
@@ -1454,28 +1492,28 @@ void update()
       camStartPos = camEndPos;
       int roomIdx = get_room_idx();
       camEndPos.y = -90.0f - 176.0f * (float)roomIdx;
-      camEndPos.x = renderData->camera.position.x;
+      camEndPos.x = renderData->gameCamera.position.x;
 
 
       if(key_pressed_this_frame(KEY_H))
       {
-        renderData->camera.position.y -= 1.0f;
+        renderData->gameCamera.position.y -= 1.0f;
       }
 
       if(key_pressed_this_frame(KEY_J))
       {
-        renderData->camera.position.y += 1.0f;
+        renderData->gameCamera.position.y += 1.0f;
       }
     } 
 
     if(key_is_down(KEY_Z))
     {
-      renderData->camera.zoom += dt;
+      renderData->gameCamera.zoom += dt;
     }
 
     if(key_is_down(KEY_T))
     {
-      renderData->camera.zoom -= dt;
+      renderData->gameCamera.zoom -= dt;
     }
   }
 
@@ -1486,18 +1524,16 @@ void update()
   {
     case GAME_STATE_MAIN_MENU:
     {
-      if(do_button(SPRITE_PLAY_BUTTON, {0, 80}, line_id(1)))
+      if(do_button(SPRITE_PLAY_BUTTON, {160, 90}, line_id(1)))
       {
         gameState->state = GAME_STATE_IN_LEVEL;
       }
-
       break;
     }
 
     case GAME_STATE_IN_LEVEL:
     {
       update_level(dt);
-
       break;
     }
   }

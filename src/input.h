@@ -92,11 +92,9 @@ struct Key
 struct Input
 {
   Vec2 screenSize;
-  Vec2 relMouseScreen;
-  Vec2 prevMousePosScreen;
-  Vec2 mousePosScreen;
-  Vec2 mousePosWorld;
-  Vec2 cameraLocalPos;
+  IVec2 relMouse;
+  IVec2 prevMousePos;
+  IVec2 mousePos;
 
   Key keys[MAX_KEYCODES];
 };

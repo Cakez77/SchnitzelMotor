@@ -80,6 +80,7 @@ bool is_hot(int ID)
 bool do_button(SpriteID spriteID, IVec2 pos, int ID)
 {
   Sprite sprite = get_sprite(spriteID);
+  Vec2 mousePosWold = screen_to_ui(renderData->uiCamera, input->mousePos);
   // Draw UI Element (Adds to an array of elements to draw during render())
   {
     UIElement uiElement = 
@@ -96,7 +97,7 @@ bool do_button(SpriteID spriteID, IVec2 pos, int ID)
   if(is_active(ID))
   {
     if(key_released_this_frame(KEY_LEFT_MOUSE) &&
-       point_in_rect(input->mousePosWorld, rect))
+       point_in_rect(mousePosWold, rect))
     {
       // Set inactive     
       uiState->active = {};
@@ -111,7 +112,7 @@ bool do_button(SpriteID spriteID, IVec2 pos, int ID)
     }
   }
 
-  if(point_in_rect(input->mousePosWorld, rect))
+  if(point_in_rect(mousePosWold, rect))
   {
     set_hot(ID);
   }

@@ -1,3 +1,4 @@
+#pragma once
 
 #include "schnitzel_lib.h"
 #include "ui.h"
@@ -8,7 +9,7 @@
 // #############################################################################
 //                           Game Constants
 // #############################################################################
-constexpr int UPDATES_PER_SECOND = 60;
+constexpr int UPDATES_PER_SECOND = 45;
 constexpr double UPDATE_DELAY = 1.0 / UPDATES_PER_SECOND;
 constexpr int TILESIZE = 8;
 constexpr int WORLD_HEIGHT = 180 * 3;

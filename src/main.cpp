@@ -11,49 +11,28 @@
 #include "glcorearb.h"
 
 // #############################################################################
-//                           Platform defines
+//                           Game DLL Stuff(Hot Code Reloading)
 // #############################################################################
 // This is the function pointer to update_game in game.cpp
 typedef decltype(update_game) update_game_type;
-
-// #############################################################################
-//                           Platform Constants
-// #############################################################################
-constexpr int TRANSIENT_STORAGE_SIZE = MB(128);
-constexpr int PERSISTENT_STORAGE_SIZE = MB(256);
-
-// #############################################################################
-//                           Platform Globals
-// #############################################################################
-static bool running = true;
-static KeyCodes KeyCodeLookupTable[MAX_KEYCODES];
 static update_game_type* update_game_ptr;
-static BumpAllocator transientStorage;
-static BumpAllocator persistentStorage;
-static float musicVolume = 0.25f;
 
 // #############################################################################
-//                           Platform Functions
+//                           Platform Includes
 // #############################################################################
-void platform_fill_keycode_lookup_table();
-bool platform_create_window(int width, int height, char* title);
-void platform_update_window();
-void* platform_load_gl_func(char* funName);
-void platform_swap_buffers();
-void platform_set_vsync(bool vSync);
-void platform_reload_dynamic_library();
-bool platform_init_audio();
-void platform_update_audio(float dt);
-
-// #############################################################################
-//                           Windows Platform
-// #############################################################################
+#include "platform.h"
 #ifdef _WIN32
 #include "win32_platform.cpp"
+char* gameDLLName = "game.dll";
+char* gameLoadDLLName = "game_load.dll";
 #elif defined(__APPLE__)
 #include "mac_platform.cpp"
+char* gameDLLName = "game.so"; // ?????
+char* gameLoadDLLName = "game_load.so";
 #else // Linux
 #include "linux_platform.cpp"
+char* gameDLLName = "game.so";
+char* gameLoadDLLName = "game_load.so";
 #endif
 
 // #############################################################################
@@ -62,12 +41,13 @@ void platform_update_audio(float dt);
 #include "gl_renderer.cpp"
 
 // #############################################################################
-//                           Cross Platform STD
+//                           Cross Platform
 // #############################################################################
 // Used to get Delta Time
 #include <chrono>
 
 double get_delta_time();
+void reload_game_dll();
 
 
 int main()
@@ -128,10 +108,8 @@ int main()
     transientStorage.used = 0;
 
     // Load the update_game function pointer from the DLL
-    platform_reload_dynamic_library();
+    reload_game_dll();
     platform_update_window();
-    input->cameraLocalPos = { input->mousePosWorld.x - renderData->camera.dimensions.x / 2.0f,
-                            -input->mousePosWorld.y + renderData->camera.dimensions.y / 2.0f};
 
     update_game(gameState, input, renderData, soundState, uiState, &transientStorage, dt);
     gl_render();
@@ -152,7 +130,7 @@ void update_game(GameState* gameState, Input* inputIn,
 }
 
 // #############################################################################
-//                           Cross Platform STD 
+//                           Cross Platform
 // #############################################################################
 double get_delta_time()
 {
@@ -165,4 +143,35 @@ double get_delta_time()
   lastTime = currentTime; 
 
   return delta;
+}
+
+void reload_game_dll()
+{
+  static void* gameDLL;
+  static long long lastTimestampGameDLL;
+
+  long long currentTimestampGameDLL = get_timestamp(gameDLLName);
+  if(currentTimestampGameDLL > lastTimestampGameDLL)
+  {
+    if(gameDLL)
+    {
+      bool freeResult = platform_free_dynamic_library(gameDLL);
+      SM_ASSERT(freeResult, "Failed to free game.dll");
+      gameDLL = nullptr;
+      SM_TRACE("Freed %s", gameDLLName);
+    }
+
+    while(!copy_file(gameDLLName, gameLoadDLLName, &transientStorage))
+    {
+      Sleep(10);
+    }
+    SM_TRACE("Copied %s", gameDLLName);
+
+    gameDLL =  platform_load_dynamic_library(gameLoadDLLName);
+    SM_ASSERT(gameDLL, "Failed to load %s", gameDLLName);
+
+    update_game_ptr = (update_game_type*)platform_load_dynamic_function(gameDLL, "update_game");
+    SM_ASSERT(update_game_ptr, "Failed to load update_game function");
+    lastTimestampGameDLL = currentTimestampGameDLL;
+  }
 }

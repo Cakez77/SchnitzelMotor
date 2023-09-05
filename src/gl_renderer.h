@@ -1,4 +1,4 @@
-// Because VSCODE is dogshit and can't find it otherwise
+#pragma once
 #include "glcorearb.h"
 
 // #############################################################################

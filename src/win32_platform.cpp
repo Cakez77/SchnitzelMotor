@@ -1,5 +1,6 @@
+#include "schnitzel_lib.h"
+
 #define WIN32_LEAN_AND_MEAN
-#define GET
 #define NOMINMAX
 #include <windows.h>
 #include <xaudio2.h>
@@ -452,15 +453,9 @@ void platform_update_window()
   // Think about it
   ScreenToClient(window, &p);
 
-  input->prevMousePosScreen = input->mousePosScreen;
-  input->mousePosScreen = Vec2{(float)p.x, (float)p.y};
-  input->mousePosWorld = input->mousePosScreen / worldScale;
-  input->mousePosWorld.x += -renderData->camera.dimensions.x / 2.0f + 
-                             renderData->camera.position.x;
-  input->mousePosWorld.y = -(input->mousePosWorld.y - 
-                             renderData->camera.dimensions.y / 2.0f + 
-                             renderData->camera.position.y);
-  input->relMouseScreen = input->mousePosScreen - input->prevMousePosScreen;
+  input->prevMousePos = input->mousePos;
+  input->mousePos = IVec2{p.x, p.y};
+  input->relMouse = input->mousePos - input->prevMousePos;
 
   while(PeekMessageA(&msg, window, 0, 0, PM_REMOVE))
   {
@@ -495,37 +490,34 @@ void platform_set_vsync(bool vSync)
   wglSwapIntervalEXT_ptr(vSync);
 }
 
+void* platform_load_dynamic_library(char* dll)
+{
+  HMODULE result = LoadLibraryA(dll);
+  SM_ASSERT(result, "Failed to load dll: %s", dll);
+
+  return result;
+}
+
+void* platform_load_dynamic_function(void* dll, char* funName)
+{
+  FARPROC proc = GetProcAddress((HMODULE)dll, funName);
+  SM_ASSERT(proc, "Failed to load function: %s from DLL", funName);
+
+  return (void*)proc;
+}
+
+bool platform_free_dynamic_library(void* dll)
+{
+  SM_ASSERT(dll, "No DLL supplied!");
+  BOOL freeResult = FreeLibrary((HMODULE)dll);
+  SM_ASSERT(freeResult, "Failed to FreeLibrary");
+
+  return (bool)freeResult;
+}
+
 void glDebugMessageCallback (GLDEBUGPROC callback, const void *userParam)
 {
   glDebugMessageCallback_ptr(callback, userParam);
-}
-
-void platform_reload_dynamic_library()
-{
-  static HMODULE gameDLL;
-  static long long lastTimestampGameDLL;
-
-  long long currentTimestampGameDLL = get_timestamp("game.dll");
-  if(currentTimestampGameDLL > lastTimestampGameDLL)
-  {
-    if(gameDLL)
-    {
-      BOOL freeResult = FreeLibrary(gameDLL);
-      SM_ASSERT(freeResult, "Failed to FreeLibrary game.dll");
-      gameDLL = nullptr;
-      SM_TRACE("Freed game.dll");
-    }
-
-    while(!CopyFileA("game.dll", "game_load.dll", false)) { Sleep(10); }
-    SM_TRACE("Copied game.dll");
-
-    gameDLL = LoadLibraryA("game_load.dll");
-    SM_ASSERT(gameDLL, "Failed to load game.dll");
-
-    update_game_ptr = (update_game_type*)GetProcAddress(gameDLL, "update_game");
-    SM_ASSERT(update_game_ptr, "Failed to load update_game function");
-    lastTimestampGameDLL = currentTimestampGameDLL;
-  }
 }
 
 bool platform_init_audio()

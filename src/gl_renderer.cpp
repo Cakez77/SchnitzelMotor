@@ -335,47 +335,92 @@ void gl_render()
   // Copy screenSize to the GPU
   glUniform2fv(glContext.screenSizeID, 1, &input->screenSize.x);
 
-  // Calculate projection matrix for 2D
+  // Game Pass
   {
-    OrthographicCamera2D camera = renderData->camera;
-    float zoom = camera.zoom? camera.zoom : 1.0f;
-    Vec2 dimensions = camera.dimensions * 1.0f / zoom;
-    Vec2 position = camera.position * (float)max((int)(1.0f / zoom), 1);
-    Mat4 projectionMatrix = 
-      orthographic_projection(position.x - dimensions.x / 2.0f, 
-                              position.x + dimensions.x / 2.0f, 
-                              position.y - dimensions.y / 2.0f, 
-                              position.y + dimensions.y / 2.0f);
+    // Calculate projection matrix for 2D Game
+    {
+      glUniformMatrix4fv(glContext.projectionID, 1, GL_FALSE, 
+                        &renderData->orthoProjectionGame.ax);
+    }
 
-    glUniformMatrix4fv(glContext.projectionID, 1, GL_FALSE, 
-                      &projectionMatrix.ax);
+    // Opaque Objects
+    {
+      // Copy transforms to the GPU
+      glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Transform) * MAX_TRANSFORMS,
+                      renderData->transforms.elements);
+      // Reset for next Frame
+
+      glDrawArraysInstanced(GL_TRIANGLES, 0, 6, renderData->transforms.count);
+      renderData->transforms.clear();
+    }
+
+    // Transparent Objects
+    {
+      glEnable(GL_BLEND);      
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+      // Copy transparent transforms to the GPU
+      glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Transform) * MAX_TRANSFORMS,
+                      renderData->transparentTransforms.elements);
+      // Reset for next Frame
+      glDrawArraysInstanced(GL_TRIANGLES, 0, 6, renderData->transparentTransforms.count);
+      glDisable(GL_BLEND);
+      renderData->transparentTransforms.clear();
+    }
   }
 
-  // Opaque Objects
+  // UI Pass
   {
-    // Copy transforms to the GPU
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Transform) * MAX_TRANSFORMS,
-                    renderData->transforms.elements);
-    // Reset for next Frame
+    // Calculate projection matrix for 2D UI
+    {
+      glUniformMatrix4fv(glContext.projectionID, 1, GL_FALSE, 
+                        &renderData->orthoProjectionUI.ax);
+    }
 
-    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, renderData->transforms.count);
-    renderData->transforms.clear();
+    // Opaque Objects
+    {
+      // Copy transforms to the GPU
+      glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Transform) * MAX_TRANSFORMS,
+                      renderData->uiTransforms.elements);
+      // Reset for next Frame
+
+      glDrawArraysInstanced(GL_TRIANGLES, 0, 6, renderData->uiTransforms.count);
+      renderData->uiTransforms.clear();
+    }
+
+    // Transparent Objects
+    {
+      glEnable(GL_BLEND);      
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+      // Copy transparent transforms to the GPU
+      glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Transform) * MAX_TRANSFORMS,
+                      renderData->uiTransparentTransforms.elements);
+      // Reset for next Frame
+      glDrawArraysInstanced(GL_TRIANGLES, 0, 6, renderData->uiTransparentTransforms.count);
+      glDisable(GL_BLEND);
+      renderData->uiTransparentTransforms.clear();
+    }
   }
 
-  // Transparent Objects
-  {
-    glEnable(GL_BLEND);      
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    // Copy transparent transforms to the GPU
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Transform) * MAX_TRANSFORMS,
-                    renderData->transparent_transforms.elements);
-    // Reset for next Frame
-    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, renderData->transparent_transforms.count);
-    glDisable(GL_BLEND);
-    renderData->transparent_transforms.clear();
-  }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
