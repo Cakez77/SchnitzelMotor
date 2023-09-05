@@ -238,8 +238,16 @@ void platform_update_window()
   int win_y;
   unsigned int mask_return;
   XQueryPointer(display, window, &root, &child, &root_x, &root_y, &win_x, &win_y, &mask_return);
+
+  input->prevMousePosScreen = input->mousePosScreen;
   input->mousePosScreen = Vec2{(float)win_x, (float)win_y};
   input->mousePosWorld = input->mousePosScreen / worldScale;
+  input->mousePosWorld.x += -renderData->camera.dimensions.x / 2.0f +
+                             renderData->camera.position.x;
+  input->mousePosWorld.y = -(input->mousePosWorld.y -
+                             renderData->camera.dimensions.y / 2.0f +
+                             renderData->camera.position.y);
+  input->relMouseScreen = input->mousePosScreen - input->prevMousePosScreen;
 
   // XPending doesn't block
   while (XPending(display))
