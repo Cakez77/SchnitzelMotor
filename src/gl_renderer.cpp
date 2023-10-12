@@ -278,7 +278,8 @@ bool gl_init(BumpAllocator* transientStorage)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, width, height, 
+                 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     stbi_image_free(data);
   }
 
@@ -308,6 +309,7 @@ void gl_render()
   long long textureTimestamp = get_timestamp(glContext.texturePath);
   if(textureTimestamp > glContext.textureTimestamp)
   {
+    glActiveTexture(GL_TEXTURE0);
     int width, height, nChannels;
     char* data = (char*)stbi_load(glContext.texturePath, 
                                   &width, &height, &nChannels, 4);
@@ -402,7 +404,6 @@ void gl_render()
       renderData->uiTransparentTransforms.clear();
     }
   }
-
 }
 
 

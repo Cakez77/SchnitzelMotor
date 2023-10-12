@@ -8,6 +8,7 @@
 //                           UI Constants
 // #############################################################################
 constexpr int MAX_UI_ELEMENTS = 100;
+constexpr int MAX_TEXT_CHARS = 256;
 
 // #############################################################################
 //                           UI Structs
@@ -24,12 +25,20 @@ struct UIElement
   Vec2 pos;
 };
 
+struct UIText
+{
+  int charCount;
+  char text[MAX_TEXT_CHARS];
+  Vec2 pos;
+};
+
 struct UIState
 {
   UIID hotLastFrame;
   UIID hotThisFrame;
   UIID active;
 
+  Array<UIText, 100> texts;
   Array<UIElement, MAX_UI_ELEMENTS> uiElements;
 };
 
@@ -77,10 +86,15 @@ bool is_hot(int ID)
   return uiState->hotLastFrame.ID && uiState->hotLastFrame.ID == ID;
 }
 
+bool ui_is_hot()
+{
+  return uiState->hotLastFrame.ID || uiState->hotLastFrame.ID;
+}
+
 bool do_button(SpriteID spriteID, IVec2 pos, int ID)
 {
   Sprite sprite = get_sprite(spriteID);
-  Vec2 mousePosWold = screen_to_ui(renderData->uiCamera, input->mousePos);
+  Vec2 mousePosWold = screen_to_ui(input->mousePos);
   // Draw UI Element (Adds to an array of elements to draw during render())
   {
     UIElement uiElement = 
@@ -120,8 +134,20 @@ bool do_button(SpriteID spriteID, IVec2 pos, int ID)
   return false;
 }
 
+void do_ui_text(char* text, Vec2 pos)
+{
+  UIText uiText = {};
+  memcpy(uiText.text, text, strlen(text));
+  uiText.charCount = strlen(text);
+  uiText.pos = pos;
 
+  uiState->texts.add(uiText);
+}
 
-
-
+template <typename... Args>
+void do_format_ui_text(char* format, Vec2 pos, Args... args)
+{
+  char* text = format_text(format, args...);
+  do_ui_text(text, pos);
+}
 

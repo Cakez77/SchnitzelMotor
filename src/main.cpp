@@ -49,7 +49,6 @@ char* gameLoadDLLName = "game_load.so";
 double get_delta_time();
 void reload_game_dll();
 
-
 int main()
 {
   // Init lastTime

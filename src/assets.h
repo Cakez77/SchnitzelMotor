@@ -14,6 +14,7 @@ enum SpriteID
   SPRITE_SPIKE,
   SPRITE_CELESTE_DEATH,
   SPRITE_PLAY_BUTTON,
+  SPRITE_SAVE_BUTTON,
   SPRITE_SOLID_01,
   SPRITE_SOLID_02,
 
@@ -110,6 +111,14 @@ Sprite get_sprite(SpriteID spriteID)
     case SPRITE_PLAY_BUTTON:
     {
       sprite.atlasOffset = {0, 32};
+      sprite.size = {32, 16};
+      sprite.frameCount = 1;
+      break;
+    }
+
+    case SPRITE_SAVE_BUTTON:
+    {
+      sprite.atlasOffset = {0, 48};
       sprite.size = {32, 16};
       sprite.frameCount = 1;
       break;

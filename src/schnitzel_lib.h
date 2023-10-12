@@ -324,6 +324,11 @@ IVec2 operator-(IVec2 a, IVec2 b)
   return IVec2{a.x - b.x, a.y - b.y};
 }
 
+IVec2 operator-(IVec2 a, int scalar)
+{
+  return IVec2{a.x - scalar, a.y - scalar};
+}
+
 IVec2 operator+(IVec2 a, IVec2 b)
 {
   return IVec2{a.x + b.x, a.y + b.y};
@@ -877,6 +882,20 @@ long long get_timestamp(char* file)
     struct stat file_stat = {};
     stat(file, &file_stat);
     return file_stat.st_mtime;
+}
+
+bool file_exists(char* filePath)
+{
+  SM_ASSERT(filePath, "No filePath supplied!");
+
+  auto file = fopen(filePath, "rb");
+  if(!file)
+  {
+    return false;
+  }
+  fclose(file);
+
+  return true;
 }
 
 long get_file_size(char* filePath)

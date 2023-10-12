@@ -9,10 +9,10 @@
 // #############################################################################
 //                           Game Constants
 // #############################################################################
-constexpr int UPDATES_PER_SECOND = 45;
+constexpr int UPDATES_PER_SECOND = 60;
 constexpr double UPDATE_DELAY = 1.0 / UPDATES_PER_SECOND;
 constexpr int TILESIZE = 8;
-constexpr int WORLD_HEIGHT = 180 * 3;
+constexpr int WORLD_HEIGHT = 180 * 10;
 constexpr int WORLD_WIDTH = 320;
 constexpr int ROOM_HEIGHT = 180;
 constexpr int ROOM_WIDTH = WORLD_WIDTH;

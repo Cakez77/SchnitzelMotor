@@ -58,7 +58,7 @@ static RenderData* renderData;
 // #############################################################################
 //                           Render Interface Camera Utility
 // #############################################################################
-Vec2 screen_to_ui(OrthographicCamera2D camera, IVec2 screenPos)
+Vec2 screen_to_camera(OrthographicCamera2D camera, IVec2 screenPos)
 {
   float xPos = (float)screenPos.x / 
                input->screenSize.x * 
@@ -77,27 +77,14 @@ Vec2 screen_to_ui(OrthographicCamera2D camera, IVec2 screenPos)
   return {xPos, yPos};
 }
 
-Vec2 screen_to_world(OrthographicCamera2D camera, IVec2 screenPos)
+Vec2 screen_to_ui(IVec2 screenPos)
 {
-  float xPos = (float)screenPos.x / 
-               input->screenSize.x * 
-               camera.dimensions.x; // [0; dimensions.x]
+  return screen_to_camera(renderData->uiCamera, screenPos);
+}
 
-  // Offset using dimensions and position
-  xPos += -camera.dimensions.x / 2.0f + camera.position.x;
-
-  float yPos = (float)screenPos.y / 
-               input->screenSize.y * 
-               camera.dimensions.y; // [0; dimensions.y]
-
-  // Offset using dimensions and position
-  yPos += -camera.dimensions.y / 2.0f + camera.position.y;
-
-  // Invert Y
-  yPos *= -1;
-  yPos += camera.dimensions.y;
-
-  return {xPos, yPos};
+Vec2 screen_to_world(IVec2 screenPos)
+{
+  return screen_to_camera(renderData->gameCamera, screenPos);
 }
 
 // #############################################################################
@@ -193,11 +180,6 @@ void draw_ui_sprite(SpriteID spriteID, Vec2 pos, DrawData drawData = {})
 // #############################################################################
 void draw_quad(Transform transform)
 {
-  // Screen Space Y grows down by default
-  // This inverts all Y Positions so that Y grows UP 
-  transform.pos.y *= -1;
-  transform.pos.y -= transform.size.y / 2.0f;
-
   if(transform.renderOptions & RENDERING_OPTION_TRANSPARENT)
   {
     renderData->transparentTransforms.add(transform);
@@ -245,7 +227,6 @@ void draw_text(char* text, Vec2 pos)
   while(char c = *(text++))
   {
     Glyph glyph = renderData->glyphs[c];
-    glyph.offset.y = (float)(-glyph.offset.y) / 2.0f;
     Transform transform = get_transform(pos, glyph);
     draw_quad(transform);
 
