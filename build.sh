@@ -2,15 +2,17 @@
 
 defines="-DENGINE"
 warnings="-Wno-writable-strings -Wno-format-security -Wno-c++11-extensions -Wno-deprecated-declarations"
+includes="-Ithird_party"
 timestamp=$(date +%s)
 
 if [[ "$(uname)" == "Linux" ]]; then
     echo "Running on Linux"
     libs="-lX11 -lGL -lfreetype"
-    includes="-Ithird_party -Ithird_party/Include"
     outputFile=schnitzel
     queryProcesses=$(pgrep $outputFile)
+
     # fPIC position independent code
+    rm -f game_* # Remove old game_* files
     clang++ -g "src/game.cpp" -shared -fPIC -o game_$timestamp.so $warnings $defines
     mv game_$timestamp.so game.so
 
@@ -26,7 +28,6 @@ elif [[ "$(uname)" == "Darwin" ]]; then
 else
     echo "Not running on Linux"
     libs="-luser32 -lgdi32 -lopengl32 -lole32 -Lthird_party/lib -lfreetype.lib"
-    includes="-Ithird_party -Ithird_party/Include"
     outputFile=schnitzel.exe
     queryProcesses=$(tasklist | grep $outputFile)
 
