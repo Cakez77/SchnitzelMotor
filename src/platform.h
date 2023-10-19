@@ -31,3 +31,4 @@ void* platform_load_dynamic_function(void* dll, char* funName);
 bool platform_free_dynamic_library(void* dll);
 bool platform_init_audio();
 void platform_update_audio(float dt);
+void platform_sleep(unsigned int ms);

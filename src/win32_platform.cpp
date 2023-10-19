@@ -661,3 +661,8 @@ void platform_update_audio(float dt)
 
   soundState->playingSounds.count = 0;
 }
+
+void platform_sleep(unsigned int ms)
+{
+  Sleep(ms);
+}

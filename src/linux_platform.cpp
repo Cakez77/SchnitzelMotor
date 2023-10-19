@@ -380,5 +380,7 @@ void platform_update_audio(float dt)
   soundState->playingSounds.clear();
 }
 
-
-
+void platform_sleep(unsigned int ms)
+{
+  sleep(ms);
+}

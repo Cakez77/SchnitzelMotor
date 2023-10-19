@@ -162,7 +162,7 @@ void reload_game_dll()
 
     while(!copy_file(gameDLLName, gameLoadDLLName, &transientStorage))
     {
-      Sleep(10);
+      platform_sleep(10);
     }
     SM_TRACE("Copied %s", gameDLLName);
 
