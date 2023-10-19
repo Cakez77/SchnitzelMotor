@@ -1,6 +1,6 @@
 // THESE ARE NOT NEEDED, VSCODE IS DOOOOOOOOOOGGGG SHIT
 #include "input.h"
-#include "schnitzel_lib.h"
+#include "platform.h"
 
 #include <X11/Xlib.h>
 #include <GL/glx.h>
@@ -103,15 +103,10 @@ void platform_update_window()
   unsigned int mask_return;
   XQueryPointer(display, window, &root, &child, &root_x, &root_y, &win_x, &win_y, &mask_return);
 
-  input->prevMousePosScreen = input->mousePosScreen;
-  input->mousePosScreen = Vec2{(float)win_x, (float)win_y};
-  input->mousePosWorld = input->mousePosScreen / worldScale;
-  input->mousePosWorld.x += -renderData->camera.dimensions.x / 2.0f +
-                             renderData->camera.position.x;
-  input->mousePosWorld.y = -(input->mousePosWorld.y -
-                             renderData->camera.dimensions.y / 2.0f +
-                             renderData->camera.position.y);
-  input->relMouseScreen = input->mousePosScreen - input->prevMousePosScreen;
+  input->mousePos = IVec2{win_x, win_y};
+
+  // Mouse Position World
+  input->mousePosWorld = screen_to_world(input->mousePos);
 
   // XPending doesn't block
   while (XPending(display))
@@ -133,7 +128,7 @@ void platform_update_window()
       case KeyRelease:
       {
         bool isDown = event.type == KeyPress;
-        KeyCodes keyCode = KeyCodeLookupTable[event.xkey.keycode];
+        KeyCodeID keyCode = KeyCodeLookupTable[event.xkey.keycode];
         Key* key = &input->keys[keyCode];
 
         key->justPressed = !key->justPressed && !key->isDown && isDown;
@@ -148,7 +143,7 @@ void platform_update_window()
       case ButtonRelease:
       {
         bool isDown = event.type == ButtonPress;
-        KeyCodes keyCode = KeyCodeLookupTable[BUTTONS_KEYCODE_OFFSET + event.xbutton.button];
+        KeyCodeID keyCode = KeyCodeLookupTable[BUTTONS_KEYCODE_OFFSET + event.xbutton.button];
         Key* key = &input->keys[keyCode];
 
         key->justPressed = !key->justPressed && !key->isDown && isDown;
@@ -175,7 +170,7 @@ void platform_update_window()
   }
 }
 
-void* platform_load_gl_func(char* funName)
+void* platform_load_gl_function(char* funName)
 {
   void* proc = (void*)glXGetProcAddress((const GLubyte*)funName);
   if(!proc)
@@ -196,48 +191,44 @@ void platform_set_vsync(bool vSync)
   glXSwapIntervalEXT_ptr(display, window, vSync);
 }
 
-void platform_reload_dynamic_library()
-{
-  static void* gameDLL;
-  static long long lastTimestampGameDLL;
-
-  long long currentTimestampGameDLL = get_timestamp("game.so");
-  if(currentTimestampGameDLL > lastTimestampGameDLL)
+void* platform_load_dynamic_library(const char* dll)
+{    
+  char path[256] = {};
+  sprintf(path, "./%s", dll);
+  void* lib = dlopen(path, RTLD_NOW);
+  char *errstr = dlerror(); 
+  if (errstr != NULL) 
   {
-    if(gameDLL)
-    {
-      int freeResult = dlclose(gameDLL);
-      SM_ASSERT(!freeResult, "Failed to dlclose game.so");
-      gameDLL = nullptr;
-      SM_TRACE("Freed game.so");
-    }
-
-    while(!copy_file("game.so", "game_load.so", &transientStorage))
-    {
-      sleep(10);
-    }
-    SM_TRACE("Copied game.dll");
-
-    gameDLL = dlopen("./game_load.so", RTLD_NOW);
-    char *errstr = dlerror(); 
-    if (errstr != NULL) 
-    {
-      printf ("A dynamic linking error occurred: (%s)\n", errstr);
-    }
-    SM_ASSERT(gameDLL, "Failed to load game.so");
-
-    update_game_ptr = (update_game_type*)dlsym(gameDLL, "update_game");
-    SM_ASSERT(update_game_ptr, "Failed to load update_game function");
-    lastTimestampGameDLL = currentTimestampGameDLL;
+    SM_ASSERT(false, "A dynamic linking error occurred: (%s)\n", errstr);
   }
+  SM_ASSERT(lib, "Failed to load lib: %s", dll);
+
+  return lib;
+}
+
+void* platform_load_dynamic_function(void* dll, const char* funName)
+{
+  void* proc = dlsym(dll, funName);
+  SM_ASSERT(proc, "Failed to load function: %s from lib", funName);
+
+  return proc;
+}
+
+bool platform_free_dynamic_library(void* dll)
+{
+  SM_ASSERT(dll, "No lib supplied!");
+  int freeResult = dlclose(dll);
+  SM_ASSERT(!freeResult, "Failed to dlclose");
+
+  return (bool)freeResult;
 }
 
 void platform_fill_keycode_lookup_table()
 {
   // Mouse
-  KeyCodeLookupTable[BUTTONS_KEYCODE_OFFSET + Button1] = KEY_LEFT_MOUSE;
-  KeyCodeLookupTable[BUTTONS_KEYCODE_OFFSET + Button2] = KEY_MIDDLE_MOUSE;
-  KeyCodeLookupTable[BUTTONS_KEYCODE_OFFSET + Button3] = KEY_RIGHT_MOUSE;
+  KeyCodeLookupTable[BUTTONS_KEYCODE_OFFSET + Button1] = KEY_MOUSE_LEFT;
+  KeyCodeLookupTable[BUTTONS_KEYCODE_OFFSET + Button2] = KEY_MOUSE_MIDDLE;
+  KeyCodeLookupTable[BUTTONS_KEYCODE_OFFSET + Button3] = KEY_MOUSE_RIGHT;
 
   // A - Z
   KeyCodeLookupTable[XKeysymToKeycode(display, XK_A)] = KEY_A;

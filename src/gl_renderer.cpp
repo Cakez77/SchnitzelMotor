@@ -131,6 +131,50 @@ static void APIENTRY gl_debug_callback(GLenum source, GLenum type, GLuint id, GL
   }
 }
 
+GLuint gl_create_shader(int shaderType, char* shaderPath, BumpAllocator* transientStorage)
+{
+  int fileSize = 0;
+  char* shaderHeader = read_file("src/shader_header.h", &fileSize, transientStorage);
+  char* shaderSource = read_file(shaderPath, &fileSize, transientStorage);
+  if(!shaderHeader)
+  {
+    SM_ASSERT(false, "Failed to load shader_header.h");
+    return 0;
+  }
+  if(!shaderSource)
+  {
+    SM_ASSERT(false, "Failed to load shader: %s",shaderPath);
+    return 0;
+  }
+
+  char* shaderSources[] =
+  {
+    "#version 430 core\r\n",
+    shaderHeader,
+    shaderSource
+  };
+
+  GLuint shaderID = glCreateShader(shaderType);
+  glShaderSource(shaderID, ArraySize(shaderSources), shaderSources, 0);
+  glCompileShader(shaderID);
+
+  // Test if Shader compiled successfully 
+  {
+    int success;
+    char shaderLog[2048] = {};
+
+    glGetShaderiv(shaderID, GL_COMPILE_STATUS, &success);
+    if(!success)
+    {
+      glGetShaderInfoLog(shaderID, 2048, 0, shaderLog);
+      SM_ASSERT(false, "Failed to compile %s Shader, Error: %s", shaderPath, shaderLog);
+      return 0;
+    }
+  }
+
+  return shaderID;
+}
+
 bool gl_init(BumpAllocator* transientStorage)
 {
   load_gl_functions();
@@ -139,85 +183,35 @@ bool gl_init(BumpAllocator* transientStorage)
   glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
   glEnable(GL_DEBUG_OUTPUT);
 
-  int vertShaderID = glCreateShader(GL_VERTEX_SHADER);
-  int fragShaderID = glCreateShader(GL_FRAGMENT_SHADER);
-
-  int fileSize = 0;
-  char* shaderHeader = read_file("src/shader_header.h", &fileSize, transientStorage);
-  char* vertShaderSource = read_file("assets/shaders/quad.vert", &fileSize, transientStorage);
-  char* fragShaderSource = read_file("assets/shaders/quad.frag", &fileSize, transientStorage);
-
-  if(!shaderHeader)
+  GLuint vertShaderID = gl_create_shader(GL_VERTEX_SHADER, 
+                                         "assets/shaders/quad.vert", transientStorage);
+  GLuint fragShaderID = gl_create_shader(GL_FRAGMENT_SHADER, 
+                                         "assets/shaders/quad.frag", transientStorage);
+  if(!vertShaderID || !fragShaderID)
   {
-    SM_ASSERT(0, "Failed to load Shader Header: %s", "src/shader_header.h");
+    SM_ASSERT(false, "Failed to create Shaders")
     return false;
-  }
-
-  if(!vertShaderSource)
-  {
-    SM_ASSERT(0, "Failed to load Shader: %s", "assets/shaders/quad.vert");
-    return false;
-  }
-
-  if(!fragShaderSource)
-  {
-    SM_ASSERT(0, "Failed to load Shader: %s", "assets/shaders/quad.frag");
-    return false;
-  }
-
-  // Vertex Shader 
-  {
-    char* shaderSources[] =
-    {
-      "#version 430 core\n",
-      shaderHeader,
-      vertShaderSource
-    };
-
-    glShaderSource(vertShaderID, ArraySize(shaderSources), shaderSources, 0);
-    glCompileShader(vertShaderID);
-
-    // Validate if the Shader works
-    {
-      int success;
-      char shaderLog[1024] = {};
-      glGetShaderiv(vertShaderID, GL_COMPILE_STATUS, &success);
-      if(!success)
-      {
-        glGetShaderInfoLog(vertShaderID, 1024, 0, shaderLog);
-        SM_ASSERT(0, "Failed to compile shader: %s", shaderLog);
-      }
-    }
-  }
-
-  // Fragment Shader
-  {
-    char* shaderSources[] =
-    {
-      "#version 430 core\r\n",
-      shaderHeader,
-      fragShaderSource
-    };
-
-    glShaderSource(fragShaderID, ArraySize(shaderSources), shaderSources, 0);
-    glCompileShader(fragShaderID);
-    // Validate if the Shader works
-    {
-      int success;
-      char shaderLog[1024] = {};
-      glGetShaderiv(fragShaderID, GL_COMPILE_STATUS, &success);
-      if(!success)
-      {
-        glGetShaderInfoLog(fragShaderID, 1024, 0, shaderLog);
-        SM_ASSERT(0, "Failed to compile shader: %s", shaderLog);
-      }
-    }
   }
 
   glContext.programID = glCreateProgram();
   glAttachShader(glContext.programID, vertShaderID);
   glAttachShader(glContext.programID, fragShaderID);
   glLinkProgram(glContext.programID);
+
+  // Validate if program works
+  {
+    int programSuccess;
+    char programInfoLog[512];
+    glGetProgramiv(glContext.programID, GL_LINK_STATUS, &programSuccess);
+
+    if(!programSuccess)
+    {
+      glGetProgramInfoLog(glContext.programID, 512, 0, programInfoLog);
+
+      SM_ASSERT(0, "Failed to link program: %s", programInfoLog);
+      return false;
+    }
+  }
 
   // This is preemtively, because they are still bound
   // They are already marked for deletion tho
