@@ -12,7 +12,6 @@ constexpr float DEATH_ANIM_TIME = 0.25f;
 //                           Game Globals
 // #############################################################################
 static BumpAllocator* transientStorage;
-static GameState* gameState;
 
 // #############################################################################
 //                           Game Functions
@@ -50,16 +49,15 @@ void update();
 // #############################################################################
 //                           Update Game (Exported from DLL)
 // #############################################################################
-EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, 
-                           RenderData* renderDataIn, SoundState* soundStateIn,
-                           UIState* uiStateIn, BumpAllocator* transientStorageIn,
-                           double frameTime)
+EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* renderDataIn, 
+                           SoundState* soundStateIn, UIState* uiStateIn,
+                           BumpAllocator* transientStorageIn, float frameTime)
 {
   if(gameState != gameStateIn)
   {
+    gameState = gameStateIn;
     input = inputIn;
     renderData = renderDataIn;
-    gameState = gameStateIn;
     soundState = soundStateIn;
     uiState = uiStateIn;
     transientStorage = transientStorageIn;
@@ -279,14 +277,6 @@ bool just_pressed(GameInputType type)
 // #############################################################################
 //                           Implementations Tiles
 // #############################################################################
-IVec2 get_world_pos(IVec2 mousePos)
-{
-  Vec2 localPos = vec_2(mousePos) / worldScale;
-  localPos.x += -renderData->gameCamera.dimensions.x / 2.0f + renderData->gameCamera.position.x;
-  localPos.y = -(localPos.y - renderData->gameCamera.dimensions.y / 2.0f + renderData->gameCamera.position.y);
-  return ivec_2(localPos);
-}
-
 IVec2 get_player_coords()
 {
   // return {gameState->player.pos

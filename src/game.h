@@ -147,13 +147,19 @@ struct GameState
   Sound deathSound;
 };
 
-static int worldScale = 5;
+// #############################################################################
+//                           Game Globals
+// #############################################################################
+static GameState* gameState;
 
+// #############################################################################
+//                           Game Functions (Exposed)
+// #############################################################################
 extern "C"
 {
   EXPORT_FN void update_game(GameState* gameStateIn, Input* inputIn, RenderData* renderDataIn,
                              SoundState* soundStateIn, UIState* uiStateIn, 
-                             BumpAllocator* transientStorageIn, double frameTime);
+                             BumpAllocator* transientStorageIn, float frameTime);
 }
 
 

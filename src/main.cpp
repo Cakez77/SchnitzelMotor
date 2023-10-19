@@ -1,21 +1,16 @@
 #include "schnitzel_lib.h"
+
 #include "input.h"
-#include "ui.h"
+
 #include "game.h"
+
 #include "sound.h"
-#include "render_interface.h"
 
-// This is so glcorearb does not include windows.h on Windows
+#include "ui.h"
+
 #define APIENTRY
-#define GL_GLEXT_PROTOTYPES // This is so we get the function declarations
+#define GL_GLEXT_PROTOTYPES
 #include "glcorearb.h"
-
-// #############################################################################
-//                           Game DLL Stuff(Hot Code Reloading)
-// #############################################################################
-// This is the function pointer to update_game in game.cpp
-typedef decltype(update_game) update_game_type;
-static update_game_type* update_game_ptr;
 
 // #############################################################################
 //                           Platform Includes
@@ -23,16 +18,16 @@ static update_game_type* update_game_ptr;
 #include "platform.h"
 #ifdef _WIN32
 #include "win32_platform.cpp"
-char* gameDLLName = "game.dll";
-char* gameLoadDLLName = "game_load.dll";
+const char* gameLibName = "game.dll";
+const char* gameLoadLibName = "game_load.dll";
 #elif defined(__APPLE__)
 #include "mac_platform.cpp"
-char* gameDLLName = "game.so"; // ?????
-char* gameLoadDLLName = "game_load.so";
+const char* gameLibName = "game.so"; // ?????
+const char* gameLoadLibName = "game_load.so";
 #else // Linux
 #include "linux_platform.cpp"
-char* gameDLLName = "game.so";
-char* gameLoadDLLName = "game_load.so";
+const char* gameLibName = "game.so";
+const char* gameLoadLibName = "game_load.so";
 #endif
 
 // #############################################################################
@@ -41,96 +36,113 @@ char* gameLoadDLLName = "game_load.so";
 #include "gl_renderer.cpp"
 
 // #############################################################################
-//                           Cross Platform
+//                           Game DLL Stuff
+// #############################################################################
+// This is the function pointer to update_game in game.cpp
+typedef decltype(update_game) update_game_type;
+static update_game_type* update_game_ptr;
+
+// #############################################################################
+//                           Cross Platform functions
 // #############################################################################
 // Used to get Delta Time
 #include <chrono>
-
 double get_delta_time();
-void reload_game_dll();
+void reload_game_dll(BumpAllocator* transientStorage);
+
 
 int main()
 {
-  // Init lastTime
+  // Initialize timestamp
   get_delta_time();
 
-  transientStorage = make_bump_allocator(TRANSIENT_STORAGE_SIZE);
-  persistentStorage = make_bump_allocator(PERSISTENT_STORAGE_SIZE);
+  BumpAllocator transientStorage = make_bump_allocator(MB(50));
+  BumpAllocator persistentStorage = make_bump_allocator(MB(256));
 
-  GameState * gameState = (GameState*)bump_alloc(&persistentStorage, sizeof(GameState));
-
-  // Defined in the file render_interface.h
-  renderData = (RenderData*)bump_alloc(&persistentStorage, sizeof(RenderData));
-
-  // Defiend in "input.h"
   input = (Input*)bump_alloc(&persistentStorage, sizeof(Input));
+  if(!input)
+  {
+    SM_ERROR("Failed to allocate Input");
+    return -1;
+  }
+
+  renderData = (RenderData*)bump_alloc(&persistentStorage, sizeof(RenderData));
+  if(!renderData)
+  {
+    SM_ERROR("Failed to allocate RenderData");
+    return -1;
+  }
+
+  gameState = (GameState*)bump_alloc(&persistentStorage, sizeof(GameState));
+  if(!gameState)
+  {
+    SM_ERROR("Failed to allocate GameState");
+    return -1;
+  }
 
   uiState = (UIState*)bump_alloc(&persistentStorage, sizeof(UIState));
+  if(!uiState)
+  {
+    SM_ERROR("Failed to allocate UIState")
+    return -1;
+  }
 
-  // Defines in "sound.h"
   soundState = (SoundState*)bump_alloc(&persistentStorage, sizeof(SoundState));
+  if(!soundState)
+  {
+    SM_ERROR("Failed to allocate SoundState");
+    return -1;
+  }
   soundState->transientStorage = &transientStorage;
-
-  // Allocating Data for Sounds
   soundState->allocatedsoundsBuffer = bump_alloc(&persistentStorage, SOUNDS_BUFFER_SIZE);
-
-  if(!platform_create_window(ROOM_WIDTH * worldScale, 
-                             ROOM_HEIGHT * worldScale, 
-                             "Schnitzel Motor"))
+  if(!soundState->allocatedsoundsBuffer)
   {
-    SM_ERROR("Failed to create Windows Window");
+    SM_ERROR("Failed to allocated Sounds Buffer");
     return -1;
   }
 
+  platform_create_window(1280, 720, "Schnitzel Motor");
   platform_fill_keycode_lookup_table();
-
-  if(!gl_init(&transientStorage))
-  {
-    SM_ERROR("Failed to initialize OpenGL");
-    return -1;
-  }
-
+  platform_set_vsync(true);
   if(!platform_init_audio())
   {
     SM_ERROR("Failed to initialize Audio");
     return -1;
   }
 
-  platform_set_vsync(true);
+  gl_init(&transientStorage);
 
   while(running)
   {
-    // In seconds
-    double dt = get_delta_time();
+    float dt = get_delta_time();
 
-    // Resent transient Storage
-    transientStorage.used = 0;
+    reload_game_dll(&transientStorage);
 
-    // Load the update_game function pointer from the DLL
-    reload_game_dll();
+    // Update
     platform_update_window();
-
     update_game(gameState, input, renderData, soundState, uiState, &transientStorage, dt);
     gl_render();
-
-    // This is platform specific!
     platform_update_audio(dt);
+
     platform_swap_buffers();
+
+    transientStorage.used = 0;
   }
 
   return 0;
 }
 
-void update_game(GameState* gameState, Input* inputIn, 
-                 RenderData* renderDataIn, SoundState* soundStateIn,
-                 UIState* uiStateIn, BumpAllocator* transientStorageIn, double dt)
+void update_game(GameState* gameStateIn, 
+                Input* inputIn,
+                RenderData* renderDataIn, 
+                SoundState* soundStateIn,
+                UIState* uiStateIn,
+                BumpAllocator* transientStorageIn,
+                float dt)
 {
-  update_game_ptr(gameState, inputIn, renderDataIn, soundStateIn, uiStateIn, transientStorageIn, dt);
+  update_game_ptr(gameStateIn, inputIn, renderDataIn, soundStateIn, uiStateIn, transientStorageIn, dt);
 }
 
-// #############################################################################
-//                           Cross Platform
-// #############################################################################
 double get_delta_time()
 {
   // Only executed once when entering the function (static)
@@ -144,33 +156,37 @@ double get_delta_time()
   return delta;
 }
 
-void reload_game_dll()
+
+void reload_game_dll(BumpAllocator* transientStorage)
 {
   static void* gameDLL;
-  static long long lastTimestampGameDLL;
+  static long long lastEditTimestampGameDLL;
 
-  long long currentTimestampGameDLL = get_timestamp(gameDLLName);
-  if(currentTimestampGameDLL > lastTimestampGameDLL)
+  long long currentTimestampGameDLL = get_timestamp(gameLibName);
+  if(currentTimestampGameDLL > lastEditTimestampGameDLL)
   {
     if(gameDLL)
     {
       bool freeResult = platform_free_dynamic_library(gameDLL);
-      SM_ASSERT(freeResult, "Failed to free game.dll");
+      SM_ASSERT(freeResult, "Failed to free %s", gameLibName);
       gameDLL = nullptr;
-      SM_TRACE("Freed %s", gameDLLName);
+      SM_TRACE("Freed %s", gameLibName);
     }
 
-    while(!copy_file(gameDLLName, gameLoadDLLName, &transientStorage))
+    while(!copy_file(gameLibName, gameLoadLibName, transientStorage))
     {
       platform_sleep(10);
     }
-    SM_TRACE("Copied %s", gameDLLName);
+    SM_TRACE("Copied %s into %s", gameLibName, gameLoadLibName);
 
-    gameDLL =  platform_load_dynamic_library(gameLoadDLLName);
-    SM_ASSERT(gameDLL, "Failed to load %s", gameDLLName);
+    gameDLL = platform_load_dynamic_library(gameLoadLibName);
+    SM_ASSERT(gameDLL, "Failed to load %s", gameLoadLibName);
 
     update_game_ptr = (update_game_type*)platform_load_dynamic_function(gameDLL, "update_game");
     SM_ASSERT(update_game_ptr, "Failed to load update_game function");
-    lastTimestampGameDLL = currentTimestampGameDLL;
+    lastEditTimestampGameDLL = currentTimestampGameDLL;
   }
 }
+
+
+

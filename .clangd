@@ -7,13 +7,15 @@ CompileFlags:
     - "-I../third_party"
     - "-I../third_party/Include"
 
+    - "-Wno-switch"
     - "-Wno-writable-strings"
     - "-Wno-sign-compare"
     - "-Wno-deprecated-declarations"
+    - "-Wno-format-security"
 
 ---
 
 If:
-  PathExclude: "src/game.cpp"
+  PathExclude: src/game\..*
 CompileFlags:
   Add: "-include main.cpp"
