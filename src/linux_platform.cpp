@@ -170,7 +170,7 @@ void platform_update_window()
   }
 }
 
-void* platform_load_gl_function(char* funName)
+void* platform_load_gl_func(char* funName)
 {
   void* proc = (void*)glXGetProcAddress((const GLubyte*)funName);
   if(!proc)
