@@ -1339,7 +1339,7 @@ void update_level(float dt)
 
   // Leveleditor
   {
-    if(!ui_is_hot() && key_is_down(KEY_LEFT_MOUSE))
+    if(!ui_is_hot() && key_is_down(KEY_MOUSE_LEFT))
     {
       IVec2 worldPos = screen_to_world(input->mousePos);
 
@@ -1357,7 +1357,7 @@ void update_level(float dt)
       }
     }
 
-    if(key_is_down(KEY_RIGHT_MOUSE))
+    if(key_is_down(KEY_MOUSE_RIGHT))
     {
       IVec2 worldPos = screen_to_world(input->mousePos);
       Tile* tile = get_tile(worldPos);

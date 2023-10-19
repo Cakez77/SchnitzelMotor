@@ -82,7 +82,7 @@ LRESULT CALLBACK windows_window_callback(HWND window, UINT msg,
       bool isDown = (msg == WM_KEYDOWN) || (msg == WM_SYSKEYDOWN) ||
                     (msg == WM_LBUTTONDOWN);
 
-      KeyCodes keyCode = KeyCodeLookupTable[wParam];
+      KeyCodeID keyCode = KeyCodeLookupTable[wParam];
       Key* key = &input->keys[keyCode];
       key->justPressed = !key->justPressed && !key->isDown && isDown;
       key->justReleased = !key->justReleased && key->isDown && !isDown;
@@ -104,7 +104,7 @@ LRESULT CALLBACK windows_window_callback(HWND window, UINT msg,
         (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP)? VK_LBUTTON: 
         (msg == WM_MBUTTONDOWN || msg == WM_MBUTTONUP)? VK_MBUTTON: VK_RBUTTON;
 
-      KeyCodes keyCode = KeyCodeLookupTable[mouseCode];
+      KeyCodeID keyCode = KeyCodeLookupTable[mouseCode];
       Key* key = &input->keys[keyCode];
       key->justPressed = !key->justPressed && !key->isDown && isDown;
       key->justReleased = !key->justReleased && key->isDown && !isDown;
@@ -126,9 +126,9 @@ LRESULT CALLBACK windows_window_callback(HWND window, UINT msg,
 
 void platform_fill_keycode_lookup_table()
 {
-  KeyCodeLookupTable[VK_LBUTTON] = KEY_LEFT_MOUSE;
-  KeyCodeLookupTable[VK_MBUTTON] = KEY_MIDDLE_MOUSE;
-  KeyCodeLookupTable[VK_RBUTTON] = KEY_RIGHT_MOUSE;
+  KeyCodeLookupTable[VK_LBUTTON] = KEY_MOUSE_LEFT;
+  KeyCodeLookupTable[VK_MBUTTON] = KEY_MOUSE_MIDDLE;
+  KeyCodeLookupTable[VK_RBUTTON] = KEY_MOUSE_RIGHT;
   
   KeyCodeLookupTable['A'] = KEY_A;
   KeyCodeLookupTable['B'] = KEY_B;

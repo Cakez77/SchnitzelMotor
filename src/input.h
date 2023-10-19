@@ -9,11 +9,11 @@ constexpr int MAX_KEYCODES = 256;
 // #############################################################################
 //                           Input Structs
 // #############################################################################
-enum KeyCodes
+enum KeyCodeID
 {
-  KEY_LEFT_MOUSE,
-  KEY_MIDDLE_MOUSE,
-  KEY_RIGHT_MOUSE,
+  KEY_MOUSE_LEFT,
+  KEY_MOUSE_MIDDLE,
+  KEY_MOUSE_RIGHT,
   
   KEY_A, KEY_B, KEY_C, KEY_D, KEY_E, KEY_F, KEY_G, KEY_H, KEY_I, KEY_J,
   KEY_K, KEY_L, KEY_M, KEY_N, KEY_O, KEY_P, KEY_Q, KEY_R, KEY_S, KEY_T,
@@ -114,18 +114,18 @@ static Input* input;
 // #############################################################################
 //                           Input Functions
 // #############################################################################
-bool key_is_down(KeyCodes key)
+bool key_is_down(KeyCodeID key)
 {
   return input->keys[key].isDown;
 }
 
-bool key_pressed_this_frame(KeyCodes key)
+bool key_pressed_this_frame(KeyCodeID key)
 {
   Key k = input->keys[key];
   return k.halfTransitionCount > 0 && k.isDown || k.halfTransitionCount > 1;
 }
 
-bool key_released_this_frame(KeyCodes key)
+bool key_released_this_frame(KeyCodeID key)
 {
   Key k = input->keys[key];
   return k.halfTransitionCount > 0 && !k.isDown || k.halfTransitionCount > 1;

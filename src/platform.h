@@ -12,7 +12,7 @@ constexpr int PERSISTENT_STORAGE_SIZE = MB(256);
 //                           Platform Globals
 // #############################################################################
 static bool running = true;
-static KeyCodes KeyCodeLookupTable[MAX_KEYCODES];
+static KeyCodeID KeyCodeLookupTable[MAX_KEYCODES];
 static BumpAllocator transientStorage;
 static BumpAllocator persistentStorage;
 static float musicVolume = 0.25f;

@@ -52,8 +52,8 @@ static UIState* uiState;
 // #############################################################################
 void update_ui()
 {
-  if(!key_is_down(KEY_LEFT_MOUSE) && 
-     !key_released_this_frame(KEY_LEFT_MOUSE))
+  if(!key_is_down(KEY_MOUSE_LEFT) && 
+     !key_released_this_frame(KEY_MOUSE_LEFT))
   {
     uiState->active = {};
   }
@@ -110,7 +110,7 @@ bool do_button(SpriteID spriteID, IVec2 pos, int ID)
                 sprite.size};
   if(is_active(ID))
   {
-    if(key_released_this_frame(KEY_LEFT_MOUSE) &&
+    if(key_released_this_frame(KEY_MOUSE_LEFT) &&
        point_in_rect(mousePosWold, rect)) 
     {
       // Set inactive     
@@ -120,7 +120,7 @@ bool do_button(SpriteID spriteID, IVec2 pos, int ID)
   }
   else if(is_hot(ID))
   {
-    if(key_pressed_this_frame(KEY_LEFT_MOUSE))
+    if(key_pressed_this_frame(KEY_MOUSE_LEFT))
     {
       set_active(ID);
     }
