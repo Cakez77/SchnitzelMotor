@@ -58,7 +58,7 @@ static RenderData* renderData;
 // #############################################################################
 //                           Render Interface Camera Utility
 // #############################################################################
-Vec2 screen_to_camera(OrthographicCamera2D camera, IVec2 screenPos)
+IVec2 screen_to_camera(OrthographicCamera2D camera, IVec2 screenPos)
 {
   float xPos = (float)screenPos.x / 
                input->screenSize.x * 
@@ -74,15 +74,15 @@ Vec2 screen_to_camera(OrthographicCamera2D camera, IVec2 screenPos)
   // Offset using dimensions and position
   yPos += camera.dimensions.y / 2.0f + camera.position.y;
 
-  return {xPos, yPos};
+  return {(int)xPos, (int)yPos};
 }
 
-Vec2 screen_to_ui(IVec2 screenPos)
+IVec2 screen_to_ui(IVec2 screenPos)
 {
   return screen_to_camera(renderData->uiCamera, screenPos);
 }
 
-Vec2 screen_to_world(IVec2 screenPos)
+IVec2 screen_to_world(IVec2 screenPos)
 {
   return screen_to_camera(renderData->gameCamera, screenPos);
 }

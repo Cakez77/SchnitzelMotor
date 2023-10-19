@@ -429,6 +429,11 @@ bool point_in_rect(Vec2 point, IRect rect)
           point.y <= rect.pos.y + rect.size.y);
 }
 
+bool point_in_rect(IVec2 point, IRect rect)
+{
+  return point_in_rect(vec_2(point), rect);
+}
+
 bool rect_collision(IRect a, IRect b)
 {
   return a.pos.x < b.pos.x  + b.size.x && // Collision on Left of a and right of b

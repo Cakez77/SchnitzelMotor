@@ -1341,7 +1341,7 @@ void update_level(float dt)
   {
     if(!ui_is_hot() && key_is_down(KEY_LEFT_MOUSE))
     {
-      IVec2 worldPos = ivec_2(screen_to_world(input->mousePos));
+      IVec2 worldPos = screen_to_world(input->mousePos);
 
       Tile* tile = get_tile(worldPos);
       if(tile)
@@ -1359,7 +1359,7 @@ void update_level(float dt)
 
     if(key_is_down(KEY_RIGHT_MOUSE))
     {
-      IVec2 worldPos = ivec_2(screen_to_world(input->mousePos));
+      IVec2 worldPos = screen_to_world(input->mousePos);
       Tile* tile = get_tile(worldPos);
       if(tile)
       {

@@ -446,21 +446,25 @@ bool platform_create_window(int width, int height, char* title)
 
 void platform_update_window()
 {
+  // Gather new Input
   MSG msg;
-
-  POINT p;
-  GetCursorPos(&p);
-  // Think about it
-  ScreenToClient(window, &p);
-
-  input->prevMousePos = input->mousePos;
-  input->mousePos = IVec2{p.x, p.y};
-  input->relMouse = input->mousePos - input->prevMousePos;
-
   while(PeekMessageA(&msg, window, 0, 0, PM_REMOVE))
   {
     TranslateMessage(&msg);
-    DispatchMessage(&msg); // Calls the callback specified when creating the window
+    DispatchMessageA(&msg); // Calls the callback specified when creating the window
+  }
+
+  // Mouse Position
+  {
+    POINT point = {};
+    GetCursorPos(&point);
+    ScreenToClient(window, &point);
+
+    input->mousePos.x = point.x;
+    input->mousePos.y = point.y;
+     
+    // Mouse Position World
+    input->mousePosWorld = screen_to_world(input->mousePos);
   }
 }
 
