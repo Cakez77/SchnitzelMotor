@@ -877,7 +877,7 @@ char* format_text(char* format, Args... args)
 // #############################################################################
 //                           File I/O
 // #############################################################################
-long long get_timestamp(char* file)
+long long get_timestamp(const char* file)
 {
     struct stat file_stat = {};
     stat(file, &file_stat);

@@ -11,11 +11,16 @@
 #include FT_FREETYPE_H
 
 // #############################################################################
+//                           OpenGL Constants
+// #############################################################################
+const char* TEXTURE_PATH = "assets/textures/Texture_Atlas_01.png";
+
+
+// #############################################################################
 //                           OpenGL Structs
 // #############################################################################
 struct GLContext
 {
-  char* texturePath;
   int programID;
   int transformSBOID;
   int screenSizeID;
@@ -243,12 +248,11 @@ bool gl_init(BumpAllocator* transientStorage)
   // Load our first Texture
   {
     int width, height, nChannels;
-    glContext.texturePath = "assets/textures/Texture_Atlas_01.png";
-    char* data = (char*)stbi_load(glContext.texturePath, 
+    char* data = (char*)stbi_load(TEXTURE_PATH, 
                                   &width, &height, &nChannels, 4);
     int textureSizeInBytes = 4 * width * height;
 
-    glContext.textureTimestamp = get_timestamp(glContext.texturePath);
+    glContext.textureTimestamp = get_timestamp(TEXTURE_PATH);
 
     if(!data)
     {
@@ -256,7 +260,7 @@ bool gl_init(BumpAllocator* transientStorage)
       return false;
     }
 
-    glContext.textureTimestamp = get_timestamp(glContext.texturePath);
+    glContext.textureTimestamp = get_timestamp(TEXTURE_PATH);
 
     glGenTextures(1, (GLuint*)&glContext.textureID);
     glActiveTexture(GL_TEXTURE0);
@@ -300,12 +304,12 @@ bool gl_init(BumpAllocator* transientStorage)
 void gl_render()
 {
   // Hot reload texure
-  long long textureTimestamp = get_timestamp(glContext.texturePath);
+  long long textureTimestamp = get_timestamp(TEXTURE_PATH);
   if(textureTimestamp > glContext.textureTimestamp)
   {
     glActiveTexture(GL_TEXTURE0);
     int width, height, nChannels;
-    char* data = (char*)stbi_load(glContext.texturePath, 
+    char* data = (char*)stbi_load(TEXTURE_PATH, 
                                   &width, &height, &nChannels, 4);
     if(data)
     {
