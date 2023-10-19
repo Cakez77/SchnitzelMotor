@@ -57,7 +57,7 @@ static PFNGLDETACHSHADERPROC glDetachShader_ptr;
 static PFNGLDELETESHADERPROC glDeleteShader_ptr;
 static PFNGLDRAWELEMENTSINSTANCEDPROC glDrawElementsInstanced_ptr;
 static PFNGLGENERATEMIPMAPPROC glGenerateMipmap_ptr;
-
+static PFNGLVERTEXATTRIBIPOINTERPROC glVertexAttribIPointer_ptr;
 
 void load_gl_functions()
 {
@@ -114,6 +114,7 @@ void load_gl_functions()
   glDeleteShader_ptr = (PFNGLDELETESHADERPROC) platform_load_gl_func("glDeleteShader");
   glDrawElementsInstanced_ptr = (PFNGLDRAWELEMENTSINSTANCEDPROC) platform_load_gl_func("glDrawElementsInstanced");
   glGenerateMipmap_ptr = (PFNGLGENERATEMIPMAPPROC) platform_load_gl_func("glGenerateMipmap");
+  glVertexAttribIPointer_ptr = (PFNGLVERTEXATTRIBIPOINTERPROC)platform_load_gl_func("glVertexAttribIPointer");
 }
 
 // #############################################################################
@@ -377,6 +378,11 @@ void glDrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, const void
 void glGenerateMipmap(GLenum target)
 {
     glGenerateMipmap_ptr(target);
+}
+
+GLAPI void APIENTRY glVertexAttribIPointer (GLuint index, GLint size, GLenum type, GLsizei stride, const void* pointer)
+{
+  glVertexAttribIPointer_ptr(index, size, type, stride, pointer);
 }
 
 // Loaded by default it seems, but I kept them here, just in case, must be OpenGL 1.0, and static linking

@@ -1,7 +1,6 @@
 
 // Input Uniforms
 uniform vec2 screenSize;
-uniform vec2 cameraPos;
 uniform mat4 orthoProjection;
 
 // Input Buffers
@@ -12,7 +11,7 @@ layout(std430, binding = 0) buffer TransformSBO
 
 // Output
 layout (location = 0) out vec2 textureCoordsOut;
-layout (location = 1) out int renderOptionsOut;
+layout (location = 1) out flat int renderOptionsOut;
 
 void main()
 {

@@ -1,0 +1,19 @@
+name: mac
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    env:
+      CC: clang
+      CXX: clang++
+      flags: "-g -std=c++14"
+    steps:
+    - name: install dependencies
+      run: |
+        brew update
+        brew install glfw3 freetype
+    - name: checkout
+      uses: actions/checkout@v3
+    - name: build
+      run: ./build.sh

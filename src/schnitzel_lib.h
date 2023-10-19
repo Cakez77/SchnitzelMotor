@@ -103,8 +103,8 @@ void _log(char* prefix, char* msg, TextColor textColor, Args... args)
 }
 
 #define SM_TRACE(msg, ...) _log("TRACE:", msg, TEXT_COLOR_GREEN, ##__VA_ARGS__);
-#define SM_WARN(msg, ...) _log("WARN:", msg, TEXT_COLOR_YELLOW, "\033[0m", ##__VA_ARGS__);
-#define SM_ERROR(msg, ...) _log("ERROR:", msg, TEXT_COLOR_RED, "\033[0m", ##__VA_ARGS__);
+#define SM_WARN(msg, ...) _log("WARN:", msg, TEXT_COLOR_YELLOW , ##__VA_ARGS__); 
+#define SM_ERROR(msg, ...) _log("ERROR:", msg, TEXT_COLOR_RED, ##__VA_ARGS__);
 
 #define SM_ASSERT(x, msg, ...)     \
 {                                  \
@@ -134,7 +134,7 @@ struct Array
 
   int add(T element)
   {
-     SM_ASSERT(count < maxElements, "Array Full!");
+    SM_ASSERT(count < maxElements, "Array Full!");
     elements[count] = element;
     return count++;
   }
