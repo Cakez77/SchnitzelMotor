@@ -303,22 +303,21 @@ bool gl_init(BumpAllocator* transientStorage)
 
 void gl_render()
 {
-  // Hot reload texure
-  long long textureTimestamp = get_timestamp(TEXTURE_PATH);
-  if(textureTimestamp > glContext.textureTimestamp)
+  // Texture Hot Reloading
   {
-    glActiveTexture(GL_TEXTURE0);
-    int width, height, nChannels;
-    char* data = (char*)stbi_load(TEXTURE_PATH, 
-                                  &width, &height, &nChannels, 4);
-    if(data)
-    {
-      int textureSizeInBytes = 4 * width * height;
-    
+    long long currentTimestamp = get_timestamp(TEXTURE_PATH);
 
-      glContext.textureTimestamp = textureTimestamp;
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-      stbi_image_free(data);
+    if(currentTimestamp > glContext.textureTimestamp)
+    {    
+      glActiveTexture(GL_TEXTURE0);
+      int width, height, nChannels;
+      char* data = (char*)stbi_load(TEXTURE_PATH, &width, &height, &nChannels, 4);
+      if(data)
+      {
+        glContext.textureTimestamp = currentTimestamp;
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        stbi_image_free(data);
+      }
     }
   }
 
