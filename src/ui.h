@@ -3,7 +3,6 @@
 #include "input.h"
 #include "render_interface.h"
 
-
 // #############################################################################
 //                           UI Constants
 // #############################################################################
@@ -52,8 +51,7 @@ static UIState* uiState;
 // #############################################################################
 void update_ui()
 {
-  if(!key_is_down(KEY_MOUSE_LEFT) && 
-     !key_released_this_frame(KEY_MOUSE_LEFT))
+  if (!key_is_down(KEY_MOUSE_LEFT) && !key_released_this_frame(KEY_MOUSE_LEFT))
   {
     uiState->active = {};
   }
@@ -70,7 +68,7 @@ void set_active(int ID)
 
 void set_hot(int ID, int layer = 0)
 {
-  if(uiState->hotThisFrame.layer <= layer)
+  if (uiState->hotThisFrame.layer <= layer)
   {
     uiState->hotThisFrame.ID = ID;
     uiState->hotThisFrame.layer = layer;
@@ -97,36 +95,32 @@ bool do_button(SpriteID spriteID, IVec2 pos, int ID)
   IVec2 mousePosWold = screen_to_ui(input->mousePos);
   // Draw UI Element (Adds to an array of elements to draw during render())
   {
-    UIElement uiElement = 
-    {
-      .spriteID = spriteID,
-      .pos = vec_2(pos),
+    UIElement uiElement = {
+        .spriteID = spriteID,
+        .pos = vec_2(pos),
     };
     uiState->uiElements.add(uiElement);
   }
 
-  IRect rect = {pos.x - sprite.size.x / 2, 
-                pos.y - sprite.size.y / 2,
-                sprite.size};
-  if(is_active(ID))
+  IRect rect = {pos.x - sprite.size.x / 2, pos.y - sprite.size.y / 2, sprite.size};
+  if (is_active(ID))
   {
-    if(key_released_this_frame(KEY_MOUSE_LEFT) &&
-       point_in_rect(mousePosWold, rect)) 
+    if (key_released_this_frame(KEY_MOUSE_LEFT) && point_in_rect(mousePosWold, rect))
     {
-      // Set inactive     
+      // Set inactive
       uiState->active = {};
       return true;
     }
   }
-  else if(is_hot(ID))
+  else if (is_hot(ID))
   {
-    if(key_pressed_this_frame(KEY_MOUSE_LEFT))
+    if (key_pressed_this_frame(KEY_MOUSE_LEFT))
     {
       set_active(ID);
     }
   }
 
-  if(point_in_rect(mousePosWold, rect))
+  if (point_in_rect(mousePosWold, rect))
   {
     set_hot(ID);
   }
@@ -144,10 +138,8 @@ void do_ui_text(char* text, Vec2 pos)
   uiState->texts.add(uiText);
 }
 
-template <typename... Args>
-void do_format_ui_text(char* format, Vec2 pos, Args... args)
+template <typename... Args> void do_format_ui_text(char* format, Vec2 pos, Args... args)
 {
   char* text = format_text(format, args...);
   do_ui_text(text, pos);
 }
-

@@ -1,0 +1,35 @@
+---
+ColumnLimit: 90
+BreakBeforeBinaryOperators: false
+ReflowComments: true
+BasedOnStyle: LLVM
+IndentWidth: 2
+UseTab: false
+
+IndentCaseLabels: true
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterControlStatement: Always
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterStruct: true
+  AfterUnion: true
+  BeforeCatch: true
+  BeforeElse: true
+  IndentBraces: false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+AllowShortBlocksOnASingleLine: Never
+MaxEmptyLinesToKeep: 1
+
+PointerAlignment: Left
+AllowShortFunctionsOnASingleLine: None
+BinPackParameters: true
+BinPackArguments: true
+AlignAfterOpenBracket: Align
+BreakConstructorInitializers: BeforeColon
+
+---

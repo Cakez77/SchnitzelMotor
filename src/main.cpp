@@ -21,9 +21,10 @@
 const char* gameLibName = "game.dll";
 const char* gameLoadLibName = "game_load.dll";
 #elif defined(__APPLE__)
+#define USE_OPENGL410  // Use Legacy OpenGL 4.1 on Mac
 #include "mac_platform.cpp"
-const char* gameLibName = "game.so"; // ?????
-const char* gameLoadLibName = "game_load.so";
+char* gameLibName = "game.dylib"; 
+char* gameLoadLibName = "game_load.dylib";
 #else // Linux
 #include "linux_platform.cpp"
 const char* gameLibName = "game.so";
